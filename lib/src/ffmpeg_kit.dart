@@ -1,7 +1,7 @@
 part of '../my_maker_video.dart';
 
 /// Part 1: For get data like: get image path.
-class $FfmpegKit{
+class $FfmpegKit {
   const $FfmpegKit();
 /*
    Learn more: https://pub.dev/packages/ffmpeg_kit_flutter_full_gpl
@@ -13,8 +13,6 @@ class $FfmpegKit{
 
   /// NOTE | mp4 in this function can not play normal on web
 
-
-
   Future<({bool isSuccess, String message})> convertImageDirectoryToVideo({
     required String imagesPath,
     required String outputVideoPath,
@@ -25,8 +23,8 @@ class $FfmpegKit{
     var isSuccess = false;
     var message = "";
 
-    if(fps != null) assert(fps > 0);
-    if(quality != null) assert(quality > 0);
+    if (fps != null) assert(fps > 0);
+    if (quality != null) assert(quality > 0);
 
     // final command = '-framerate $framerate -i $imagesPath/%d.png '
     //     '-c:v libx264 -pix_fmt yuv420p -movflags +faststart $outputVideoPath';
@@ -51,7 +49,8 @@ class $FfmpegKit{
         message = 'Video conversion cancelled!';
       } else {
         final output = await session.getOutput();
-        message = 'Video conversion failed with return code $returnCode | log in $output';
+        message =
+            'Video conversion failed with return code $returnCode | log in $output';
       }
     }).whenComplete(() {});
 
@@ -64,8 +63,8 @@ class $FfmpegKit{
     required String outputPath,
     required int x, // Vị trí watermark trên trục X
     required int y, // Vị trí watermark trên trục Y
-    int? width,     // Chiều rộng watermark (nếu muốn thay đổi kích thước)
-    int? height,    // Chiều cao watermark (nếu muốn thay đổi kích thước)
+    int? width, // Chiều rộng watermark (nếu muốn thay đổi kích thước)
+    int? height, // Chiều cao watermark (nếu muốn thay đổi kích thước)
   }) async {
     var isSuccess = false;
     var message = "";
@@ -74,7 +73,8 @@ class $FfmpegKit{
     final scaleFilter = (width != null && height != null)
         ? "[1:v]scale=$width:$height[wm];[0:v][wm]overlay=$x:$y"
         : "overlay=$x:$y";
-    final command = '-i $videoPath -i $watermarkPath -filter_complex "$scaleFilter" -codec:a copy $outputPath';
+    final command =
+        '-i $videoPath -i $watermarkPath -filter_complex "$scaleFilter" -codec:a copy $outputPath';
 
     await FFmpegKit.execute(command).then((session) async {
       final returnCode = await session.getReturnCode();
@@ -89,10 +89,10 @@ class $FfmpegKit{
     return (isSuccess: isSuccess, message: message);
   }
 
-  Future<({bool isSuccess, String message})> reduceVideoQualityByPercentage({
-    required String inputPath,
-    required String outputPath,
-    required double qualityPercentage}) async {
+  Future<({bool isSuccess, String message})> reduceVideoQualityByPercentage(
+      {required String inputPath,
+      required String outputPath,
+      required double qualityPercentage}) async {
     // Map the quality percentage to a CRF value
     // Assuming 100% quality maps to CRF 18 (high quality) and 0% maps to CRF 51 (very low quality)
     final crfValue = (51 - 18) * (1 - qualityPercentage / 100) + 18;
@@ -101,10 +101,13 @@ class $FfmpegKit{
     // Optionally, adjust the bitrate based on quality percentage
     // Assuming 100% quality maps to a high bitrate and 0% to a low bitrate
     final maxBitrate = 5000; // Example max bitrate in kbps
-    final minBitrate = 500;  // Example min bitrate in kbps
-    final bitrate = ((maxBitrate - minBitrate) * (qualityPercentage / 100) + minBitrate).toInt();
+    final minBitrate = 500; // Example min bitrate in kbps
+    final bitrate =
+        ((maxBitrate - minBitrate) * (qualityPercentage / 100) + minBitrate)
+            .toInt();
 
-    final command = '-i $inputPath -crf ${crfValue.toInt()} -preset $preset -b:v ${bitrate}k -codec:a copy $outputPath';
+    final command =
+        '-i $inputPath -crf ${crfValue.toInt()} -preset $preset -b:v ${bitrate}k -codec:a copy $outputPath';
 
     var isSuccess = false;
     var message = "";
@@ -114,13 +117,13 @@ class $FfmpegKit{
         message = "Watermark added successfully!";
         isSuccess = true;
       } else {
-        message = "Failed to reduceVideoQualityByPercentage with return code $returnCode";
+        message =
+            "Failed to reduceVideoQualityByPercentage with return code $returnCode";
       }
     });
 
     return (isSuccess: isSuccess, message: message);
   }
-
 
   /*
   Explanation
@@ -137,7 +140,8 @@ class $FfmpegKit{
   }) async {
     // The quality parameter for GIFs is typically controlled by the `-q:v` option
     // Lower values mean better quality (e.g., 1 is high quality, 31 is low quality)
-    final command = '-i $inputPath -vf "fps=$fps,scale=$scale:-1:flags=lanczos" -q:v $quality $outputPath';
+    final command =
+        '-i $inputPath -vf "fps=$fps,scale=$scale:-1:flags=lanczos" -q:v $quality $outputPath';
 
     var isSuccess = false;
     var message = "";
@@ -147,14 +151,11 @@ class $FfmpegKit{
         message = "Watermark added successfully!";
         isSuccess = true;
       } else {
-        message =  "Failed to create GIF with return code $returnCode";
+        message = "Failed to create GIF with return code $returnCode";
       }
     });
     return (isSuccess: isSuccess, message: message);
   }
-
-
-
 }
 
 /// Part 2: For handle data like: '42'.parseInt()
@@ -172,4 +173,3 @@ class $FfmpegKit{
 
 /// Part 3: typedef
 // typedef MySeoMetaTag = MetaTag;
-

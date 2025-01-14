@@ -1,7 +1,7 @@
 name: my_maker_video
-description: "A new Flutter project."
-version: 0.0.1
-homepage:
+description: "create images to video very fast,add watermark for video, reduce quality of video, video to gif"
+version: 0.0.1+1
+repository: https://github.com/ngmduc2012/my_maker_video
 
 environment:
   sdk: ^3.6.0
