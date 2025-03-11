@@ -124,11 +124,14 @@ final result = MyMakerVideo.ffmpegKit.createGifFromVideo(
 );
 ```
 
-To learn more about what I've done in the plugin, please check out my article [https://wongcoupon.com/en/doc/help/flutter/comprehensive-guide-to-video-processing-in-flutter-using-ffmpeg](https://wongcoupon.com/en/doc/help/flutter/comprehensive-guide-to-video-processing-in-flutter-using-ffmpeg)
+To learn more about what I've done in the plugin, please check out my article 
+[https://wongcoupon.com/en/doc/help/flutter/comprehensive-guide-to-video-processing-in-flutter-using-ffmpeg](https://wongcoupon.com/en/doc/help/flutter/comprehensive-guide-to-video-processing-in-flutter-using-ffmpeg)
+[https://wong-coupon.gitbook.io/flutter/media/ffmpeg-flutter](https://wong-coupon.gitbook.io/flutter/media/ffmpeg-flutter)
 
 ## Developer Team
 For any comments or feedback, please contact us:
 - [ThaoDoan](https://github.com/mia140602)
 - [DucNguyen](https://github.com/ngmduc2012)
 
-[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-orange.png)](https://buymeacoffee.com/ducmng12g)
+[Buy Us A Coffee ❤️](https://buymeacoffee.com/ducmng12g) | [Support Us on Ko-fi ❤️](https://ko-fi.com/I2I81AEJG8)
+
