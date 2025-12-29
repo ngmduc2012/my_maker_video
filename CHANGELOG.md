@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [0.0.3+3] - 2025-12-29
+## [0.0.4+1] - 2025-12-29
 - Add Swift Package Manager support for iOS.
 - Improve public API documentation coverage.
 - Clean up example logging and async handling.
