@@ -1,19 +1,29 @@
 part of '../my_maker_video.dart';
 
+/// Signature for executing an FFmpeg command.
 typedef FfmpegExecuteFn = Future<dynamic> Function(String command);
 
+/// Minimal session interface for FFmpeg results.
 abstract class FfmpegSession {
+  /// Returns the underlying FFmpeg return code.
   Future<dynamic> getReturnCode();
+
+  /// Returns the FFmpeg command output, if any.
   Future<String?> getOutput();
 }
 
+/// Runs an FFmpeg command and returns a session.
 abstract class FfmpegExecutor {
+  /// Default executor constructor.
   const FfmpegExecutor();
 
+  /// Executes the given command and returns a session.
   Future<FfmpegSession> execute(String command);
 }
 
+/// Wraps the native FFmpegKit session.
 class FfmpegKitSession implements FfmpegSession {
+  /// Creates an adapter around the native session.
   FfmpegKitSession(this._session);
 
   final dynamic _session;
@@ -25,9 +35,12 @@ class FfmpegKitSession implements FfmpegSession {
   Future<String?> getOutput() => _session.getOutput();
 }
 
+/// Default executor that delegates to FFmpegKit.
 class FfmpegKitExecutor implements FfmpegExecutor {
+  /// Creates a default FFmpegKit executor.
   const FfmpegKitExecutor();
 
+  /// Overridable entrypoint for tests.
   @visibleForTesting
   static FfmpegExecuteFn executeImpl = FFmpegKit.execute;
 
@@ -38,8 +51,9 @@ class FfmpegKitExecutor implements FfmpegExecutor {
   }
 }
 
-/// Part 1: For get data like: get image path.
+/// High-level helpers built on top of FFmpegKit.
 class $FfmpegKit {
+  /// Creates a helper with an optional custom executor (for tests).
   const $FfmpegKit({FfmpegExecutor executor = const FfmpegKitExecutor()})
       : _executor = executor;
 
@@ -52,7 +66,9 @@ class $FfmpegKit {
    Thay thế cho thư viện gify https://pub.dev/packages/gify, gify sử dụng các tương tự nhưng khá chậm
 */
 
-  /// NOTE | mp4 in this function can not play normal on web
+  /// Creates a video from a numbered PNG sequence in [imagesPath].
+  ///
+  /// NOTE: mp4 in this function can not play normal on web.
 
   Future<({bool isSuccess, String message})> convertImageDirectoryToVideo({
     required String imagesPath,
@@ -98,6 +114,7 @@ class $FfmpegKit {
     return (isSuccess: isSuccess, message: message);
   }
 
+  /// Adds a watermark image/video to an existing video.
   Future<({bool isSuccess, String message})> addWatermarkToVideo({
     required String videoPath,
     required String watermarkPath,
@@ -130,6 +147,7 @@ class $FfmpegKit {
     return (isSuccess: isSuccess, message: message);
   }
 
+  /// Reduces video quality using a percentage mapped to CRF/bitrate.
   Future<({bool isSuccess, String message})> reduceVideoQualityByPercentage(
       {required String inputPath,
       required String outputPath,
@@ -172,6 +190,7 @@ class $FfmpegKit {
   -q:v $quality: This sets the quality of the GIF. Lower values mean better quality. Adjust this value to control the quality of the output GIF.
   $outputPath: The path where the resulting GIF will be saved.
    */
+  /// Creates a GIF from a video with the given FPS, quality, and scale.
   Future<({bool isSuccess, String message})> createGifFromVideo({
     required String inputPath,
     required String outputPath,

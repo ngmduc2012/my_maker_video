@@ -74,7 +74,7 @@ packages:
     source: hosted
     version: "2.1.3"
   ffmpeg_kit_flutter_full_gpl:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: ffmpeg_kit_flutter_full_gpl
       sha256: "4f269bcb636bfcb544e5b4d65c706a3d311839970cb42638e72406410c1b5b7b"
@@ -213,7 +213,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "0.0.2+1"
+    version: "0.0.3+2"
   path:
     dependency: transitive
     description:

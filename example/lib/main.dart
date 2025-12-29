@@ -104,15 +104,17 @@ class _ImagesToVideoState extends State<ImagesToVideo> {
                     "$outputPath/image-to-video-${Random().nextInt(20)}.mp4";
 
                 final result =
-                    MyMakerVideo.ffmpegKit.convertImageDirectoryToVideo(
+                    await MyMakerVideo.ffmpegKit.convertImageDirectoryToVideo(
                   imagesPath: inputPath!,
                   outputVideoPath: pathVideo,
                   // fps: 2
                 );
+                if (!mounted) return;
                 setState(() {
                   this.pathVideo = pathVideo;
                 });
-                print("Path | $pathVideo");
+                debugPrint("Result | ${result.message}");
+                debugPrint("Path | $pathVideo");
               }
 
               // }
@@ -125,7 +127,7 @@ class _ImagesToVideoState extends State<ImagesToVideo> {
 }
 
 Future<Directory> createDirectory(String path) async {
-  print("Path | $path");
+  debugPrint("Path | $path");
   return await Directory(path).create(recursive: true);
 }
 
@@ -193,7 +195,7 @@ class _WatermarkState extends State<Watermark> {
                 final pathVideo =
                     "$outputPath/watermark-${Random().nextInt(20)}.mp4";
 
-                final result = MyMakerVideo.ffmpegKit.addWatermarkToVideo(
+                final result = await MyMakerVideo.ffmpegKit.addWatermarkToVideo(
                     watermarkPath: watermarkPath!,
                     videoPath: videoPath!,
                     outputPath: pathVideo,
@@ -204,10 +206,12 @@ class _WatermarkState extends State<Watermark> {
 
                     // fps: 2
                     );
+                if (!mounted) return;
                 setState(() {
                   this.pathVideo = pathVideo;
                 });
-                print("Path | $pathVideo");
+                debugPrint("Result | ${result.message}");
+                debugPrint("Path | $pathVideo");
               }
 
               // }
@@ -287,16 +291,18 @@ class _ReduceVideoQualityState extends State<ReduceVideoQuality> {
                 final pathVideo =
                     "$outputPath/reduce-quality-${Random().nextInt(20)}.mp4";
 
-                final result = MyMakerVideo.ffmpegKit
+                final result = await MyMakerVideo.ffmpegKit
                     .reduceVideoQualityByPercentage(
                         inputPath: videoPath!,
                         outputPath: pathVideo,
                         qualityPercentage: 30);
 
+                if (!mounted) return;
                 setState(() {
                   this.pathVideo = pathVideo;
                 });
-                print("Path | $pathVideo");
+                debugPrint("Result | ${result.message}");
+                debugPrint("Path | $pathVideo");
               }
 
               // }
@@ -360,7 +366,7 @@ class _VideoToGifState extends State<VideoToGif> {
               if (outputPath != null && videoPath != null) {
                 final pathGif = "$outputPath/gif-${Random().nextInt(20)}.gif";
 
-                final result = MyMakerVideo.ffmpegKit.createGifFromVideo(
+                final result = await MyMakerVideo.ffmpegKit.createGifFromVideo(
                   inputPath: videoPath!,
                   outputPath: pathGif,
                   quality: 100,
@@ -368,10 +374,12 @@ class _VideoToGifState extends State<VideoToGif> {
                   fps: 2,
                 );
 
+                if (!mounted) return;
                 setState(() {
                   pathVideo = pathGif;
                 });
-                print("Path | $pathGif");
+                debugPrint("Result | ${result.message}");
+                debugPrint("Path | $pathGif");
               }
 
               // }
