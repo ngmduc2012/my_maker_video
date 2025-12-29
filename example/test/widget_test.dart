@@ -11,17 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:my_maker_video_example/main.dart';
 
 void main() {
-  testWidgets('Verify Platform version', (WidgetTester tester) async {
+  testWidgets('Verify example screen renders', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
 
-    // Verify that platform version is retrieved.
-    expect(
-      find.byWidgetPredicate(
-        (Widget widget) =>
-            widget is Text && widget.data!.startsWith('Running on:'),
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('Plugin my_maker_video example app'), findsOneWidget);
+    expect(find.text('PART I | Images to video'), findsOneWidget);
+    expect(find.text('PART II | Add Watermark To Video'), findsOneWidget);
   });
 }

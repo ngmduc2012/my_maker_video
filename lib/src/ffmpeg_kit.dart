@@ -1,8 +1,49 @@
 part of '../my_maker_video.dart';
 
+typedef FfmpegExecuteFn = Future<dynamic> Function(String command);
+
+abstract class FfmpegSession {
+  Future<dynamic> getReturnCode();
+  Future<String?> getOutput();
+}
+
+abstract class FfmpegExecutor {
+  const FfmpegExecutor();
+
+  Future<FfmpegSession> execute(String command);
+}
+
+class FfmpegKitSession implements FfmpegSession {
+  FfmpegKitSession(this._session);
+
+  final dynamic _session;
+
+  @override
+  Future<dynamic> getReturnCode() => _session.getReturnCode();
+
+  @override
+  Future<String?> getOutput() => _session.getOutput();
+}
+
+class FfmpegKitExecutor implements FfmpegExecutor {
+  const FfmpegKitExecutor();
+
+  @visibleForTesting
+  static FfmpegExecuteFn executeImpl = FFmpegKit.execute;
+
+  @override
+  Future<FfmpegSession> execute(String command) async {
+    final session = await executeImpl(command);
+    return FfmpegKitSession(session);
+  }
+}
+
 /// Part 1: For get data like: get image path.
 class $FfmpegKit {
-  const $FfmpegKit();
+  const $FfmpegKit({FfmpegExecutor executor = const FfmpegKitExecutor()})
+      : _executor = executor;
+
+  final FfmpegExecutor _executor;
 /*
    Learn more: https://pub.dev/packages/ffmpeg_kit_flutter_full_gpl
 
@@ -39,7 +80,7 @@ class $FfmpegKit {
         // '-vf "scale=3200:-1:flags=lanczos" '
         '-c:v libx264 -pix_fmt yuv420p -movflags +faststart $outputVideoPath';
 
-    await FFmpegKit.execute(command).then((session) async {
+    await _executor.execute(command).then((session) async {
       final returnCode = await session.getReturnCode();
 
       if (returnCode?.isValueSuccess() ?? false) {
@@ -76,7 +117,7 @@ class $FfmpegKit {
     final command =
         '-i $videoPath -i $watermarkPath -filter_complex "$scaleFilter" -codec:a copy $outputPath';
 
-    await FFmpegKit.execute(command).then((session) async {
+    await _executor.execute(command).then((session) async {
       final returnCode = await session.getReturnCode();
       if (returnCode?.isValueSuccess() ?? false) {
         message = "Watermark added successfully!";
@@ -111,7 +152,7 @@ class $FfmpegKit {
 
     var isSuccess = false;
     var message = "";
-    await FFmpegKit.execute(command).then((session) async {
+    await _executor.execute(command).then((session) async {
       final returnCode = await session.getReturnCode();
       if (returnCode?.isValueSuccess() ?? false) {
         message = "Watermark added successfully!";
@@ -145,7 +186,7 @@ class $FfmpegKit {
 
     var isSuccess = false;
     var message = "";
-    await FFmpegKit.execute(command).then((session) async {
+    await _executor.execute(command).then((session) async {
       final returnCode = await session.getReturnCode();
       if (returnCode?.isValueSuccess() ?? false) {
         message = "Watermark added successfully!";

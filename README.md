@@ -1,3 +1,10 @@
+[![codecov](https://codecov.io/gh/ngmduc2012/my_maker_video/branch/main/graph/badge.svg)](https://codecov.io/gh/ngmduc2012/my_maker_video)
+[![GitHub](https://img.shields.io/badge/Nguyen_Duc-GitHub-black?logo=github)](https://github.com/ngmduc2012)
+_[![Buy Me A Coffee](https://img.shields.io/badge/Donate-Buy_Me_A_Coffee-blue?logo=buymeacoffee)](https://www.buymeacoffee.com/ducmng12g)_
+_[![PayPal](https://img.shields.io/badge/Donate-PayPal-blue?logo=paypal)](https://paypal.me/ngmduc)_
+_[![Sponsor](https://img.shields.io/badge/Sponsor-Become_A_Sponsor-blue?logo=githubsponsors)](https://github.com/sponsors/ngmduc2012)_
+_[![Support Me on Ko-fi](https://img.shields.io/badge/Donate-Ko_fi-red?logo=ko-fi)](https://ko-fi.com/I2I81AEJG8)_
+
 # MyMakerVideo
 
 Effortlessly create videos from a sequence of images, add watermarks to videos with precise positioning, reduce video quality to optimize file sizes, and convert videos into high-quality GIFs. MyMakerVideo streamlines these tasks for your Flutter projects with powerful, fast, and customizable functionality.
@@ -132,6 +139,3 @@ To learn more about what I've done in the plugin, please check out my article
 For any comments or feedback, please contact us:
 - [ThaoDoan](https://github.com/mia140602)
 - [DucNguyen](https://github.com/ngmduc2012)
-
-[Buy Us A Coffee ❤️](https://buymeacoffee.com/ducmng12g) | [Support Us on Ko-fi ❤️](https://ko-fi.com/I2I81AEJG8)
-
