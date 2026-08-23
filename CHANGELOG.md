@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [0.2.0] - 2026-08-23
+- Add typed media inspection backed by FFprobe.
+- Add per-session progress streams and cancellation for long-running jobs.
+- Add thumbnail extraction and accurate/fast video trimming helpers.
+
 ## [0.1.0] - 2026-08-23
 - Upgrade the supported toolchain to Flutter 3.47.1 and Dart 3.13.1.
 - Replace the retired FFmpegKit dependency with maintained Full-GPL

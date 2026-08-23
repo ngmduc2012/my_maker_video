@@ -7,8 +7,9 @@ _[![Support Me on Ko-fi](https://img.shields.io/badge/Donate-Ko_fi-red?logo=ko-f
 
 # MyMakerVideo
 
-Create an MP4 from a numbered PNG sequence, add an image/video watermark,
-reduce video quality, or convert a video to GIF from Flutter.
+Inspect and edit media, create an MP4 from a numbered PNG sequence, add an
+image/video watermark, reduce video quality, or convert a video to GIF from
+Flutter.
 
 MyMakerVideo supports Android and iOS and uses a maintained Full-GPL FFmpegKit
 build with `libx264`.
@@ -103,6 +104,59 @@ use the same dimensions for predictable output.
 The output is H.264 MP4 with even dimensions, `yuv420p` pixel format, and
 fast-start metadata for broad player compatibility.
 
+## Inspect media
+
+Read container and stream information before processing a file:
+
+```dart
+final result = await MyMakerVideo.ffmpegKit.inspectMedia(
+  inputPath: inputVideoPath,
+);
+
+if (result.isSuccess) {
+  final info = result.mediaInfo!;
+  debugPrint('Duration: ${info.duration}');
+  debugPrint('Video: ${info.videoStream?.codec} '
+      '${info.videoStream?.width}x${info.videoStream?.height}');
+  debugPrint('Audio: ${info.audioStream?.codec}');
+}
+```
+
+`MediaInfo` includes format, duration, size, bitrate, tags, and typed audio,
+video, subtitle, and data streams. Video streams include dimensions, frame
+rate, and rotation metadata when FFprobe can determine them.
+
+## Progress and cancellation
+
+Every existing operation has a `start...` variant that returns an independent
+`FfmpegJob`:
+
+```dart
+final job = await MyMakerVideo.ffmpegKit
+    .startReduceVideoQualityByPercentage(
+  inputPath: inputVideoPath,
+  outputPath: outputVideoPath,
+  qualityPercentage: 50,
+);
+
+final subscription = job.progress.listen((progress) {
+  debugPrint('${progress.percentage?.toStringAsFixed(1)}%');
+});
+
+// Call this from a Cancel button when needed:
+// await job.cancel();
+
+final result = await job.result;
+await subscription.cancel();
+```
+
+Available job methods are `startConvertImageDirectoryToVideo`,
+`startAddWatermarkToVideo`, `startReduceVideoQualityByPercentage`,
+`startCreateGifFromVideo`, `startExtractThumbnail`, and `startTrimVideo`.
+Progress percentage is `null` when total duration cannot be determined. Failed
+and cancelled jobs delete partial output by default; pass
+`deletePartialOutput: false` to keep it.
+
 ## Add a watermark
 
 ```dart
@@ -150,6 +204,40 @@ final result = await MyMakerVideo.ffmpegKit.createGifFromVideo(
 
 GIF `quality` accepts 1 to 31; a lower value means higher quality. `fps` and
 `scale` must be greater than zero.
+
+## Extract a thumbnail
+
+```dart
+final result = await MyMakerVideo.ffmpegKit.extractThumbnail(
+  inputPath: inputVideoPath,
+  outputPath: outputJpegPath,
+  position: const Duration(seconds: 2),
+  width: 320,
+);
+```
+
+Use a `.jpg` or `.png` output path. Supply only `width` or `height` to preserve
+the original aspect ratio, or supply both to fit inside that bounding box.
+
+## Trim a video
+
+Accurate mode re-encodes the selected range and is the default:
+
+```dart
+final result = await MyMakerVideo.ffmpegKit.trimVideo(
+  inputPath: inputVideoPath,
+  outputPath: outputVideoPath,
+  start: const Duration(seconds: 2),
+  duration: const Duration(seconds: 5),
+  mode: VideoTrimMode.accurate,
+  quality: 23,
+);
+```
+
+Supply exactly one of `duration` and `end`. Use `VideoTrimMode.fast` to copy
+streams without re-encoding. Fast mode is lossless and much quicker, but its
+start can move to a nearby keyframe and the input streams must be compatible
+with the output container.
 
 ## Results and errors
 

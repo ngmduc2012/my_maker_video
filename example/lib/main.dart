@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -26,6 +27,7 @@ class MyApp extends StatelessWidget {
                 Watermark(),
                 ReduceVideoQuality(),
                 VideoToGif(),
+                MediaTools(),
               ],
             ),
           ),
@@ -342,8 +344,8 @@ class _VideoToGifState extends State<VideoToGif> {
               final result = await MyMakerVideo.ffmpegKit.createGifFromVideo(
                 inputPath: videoPath!,
                 outputPath: pathGif,
-                quality: 100,
-                scale: 3200,
+                quality: 10,
+                scale: 320,
                 fps: 2,
               );
 
@@ -360,6 +362,153 @@ class _VideoToGifState extends State<VideoToGif> {
           child: Text("Create video from image"),
         ),
         Text("STEP 5 | waiting"),
+      ],
+    );
+  }
+}
+
+class MediaTools extends StatefulWidget {
+  const MediaTools({super.key});
+
+  @override
+  State<MediaTools> createState() => _MediaToolsState();
+}
+
+class _MediaToolsState extends State<MediaTools> {
+  String? videoPath;
+  String status = 'Select a video to inspect or edit.';
+  double? progress;
+  FfmpegJob? activeJob;
+  StreamSubscription<FfmpegProgress>? progressSubscription;
+
+  @override
+  void dispose() {
+    unawaited(progressSubscription?.cancel());
+    unawaited(activeJob?.cancel());
+    super.dispose();
+  }
+
+  Future<String> _newOutputPath(String filename) async {
+    final directory = await getExampleOutputDirectory();
+    return '${directory.path}/$filename';
+  }
+
+  Future<void> _inspect() async {
+    final input = videoPath;
+    if (input == null) return;
+    final result = await MyMakerVideo.ffmpegKit.inspectMedia(inputPath: input);
+    if (!mounted) return;
+    final info = result.mediaInfo;
+    setState(() {
+      status = result.isSuccess
+          ? '${info?.duration?.inMilliseconds} ms | '
+                '${info?.videoStream?.width}x${info?.videoStream?.height} | '
+                'video=${info?.videoStream?.codec} | '
+                'audio=${info?.audioStream?.codec}'
+          : result.message;
+    });
+  }
+
+  Future<void> _extractThumbnail() async {
+    final input = videoPath;
+    if (input == null) return;
+    final output = await _newOutputPath(
+      'thumbnail-${DateTime.now().millisecondsSinceEpoch}.jpg',
+    );
+    final result = await MyMakerVideo.ffmpegKit.extractThumbnail(
+      inputPath: input,
+      outputPath: output,
+      position: const Duration(milliseconds: 500),
+      width: 320,
+    );
+    if (!mounted) return;
+    setState(() => status = result.isSuccess ? output : result.message);
+  }
+
+  Future<void> _trim() async {
+    final input = videoPath;
+    if (input == null) return;
+    final output = await _newOutputPath(
+      'trim-${DateTime.now().millisecondsSinceEpoch}.mp4',
+    );
+    final result = await MyMakerVideo.ffmpegKit.trimVideo(
+      inputPath: input,
+      outputPath: output,
+      start: Duration.zero,
+      duration: const Duration(seconds: 1),
+    );
+    if (!mounted) return;
+    setState(() => status = result.isSuccess ? output : result.message);
+  }
+
+  Future<void> _startCompression() async {
+    final input = videoPath;
+    if (input == null) return;
+    await progressSubscription?.cancel();
+    final output = await _newOutputPath(
+      'job-${DateTime.now().millisecondsSinceEpoch}.mp4',
+    );
+    final job = await MyMakerVideo.ffmpegKit
+        .startReduceVideoQualityByPercentage(
+          inputPath: input,
+          outputPath: output,
+          qualityPercentage: 50,
+        );
+    if (!mounted) {
+      await job.cancel();
+      return;
+    }
+    setState(() {
+      activeJob = job;
+      progress = 0;
+    });
+    progressSubscription = job.progress.listen((value) {
+      if (!mounted) return;
+      setState(() => progress = value.percentage);
+    });
+    final result = await job.result;
+    if (!mounted) return;
+    setState(() {
+      activeJob = null;
+      status = result.isSuccess ? output : result.message;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          'PART V | Media info, thumbnail, trim, and progress',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        TextButton(
+          onPressed: () async {
+            final selected = await pickOneVideo();
+            if (!mounted) return;
+            setState(() => videoPath = selected);
+          },
+          child: Text('Select video'),
+        ),
+        Text(videoPath ?? 'No video selected'),
+        Wrap(
+          alignment: WrapAlignment.center,
+          children: [
+            TextButton(onPressed: _inspect, child: Text('Inspect media')),
+            TextButton(
+              onPressed: _extractThumbnail,
+              child: Text('Extract thumbnail'),
+            ),
+            TextButton(onPressed: _trim, child: Text('Trim first second')),
+            TextButton(
+              onPressed: activeJob == null ? _startCompression : null,
+              child: Text('Start job'),
+            ),
+            TextButton(onPressed: activeJob?.cancel, child: Text('Cancel job')),
+          ],
+        ),
+        if (progress != null) LinearProgressIndicator(value: progress! / 100),
+        Text(status),
       ],
     );
   }

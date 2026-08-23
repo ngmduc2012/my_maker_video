@@ -1,7 +1,21 @@
 # MyMakerVideo feature roadmap
 
-This document records potential additions after the Flutter 3.47 upgrade. It
-is a proposal, not a promise that these APIs already exist.
+This document records additions after the Flutter 3.47 upgrade and future
+ideas. Check the status section before relying on an API.
+
+## Development status
+
+Implemented on the `0.2.0-dev.1` development branch:
+
+- Typed `inspectMedia` results backed by FFprobe.
+- Per-session progress, result, and cancellation through `FfmpegJob`.
+- Job variants for all existing operations.
+- Partial-output cleanup after failure or cancellation.
+- Thumbnail extraction with optional aspect-ratio-preserving dimensions.
+- Accurate H.264/AAC trim and fast stream-copy trim.
+
+These APIs are under development and are not part of the published `0.1.0`
+package yet.
 
 ## Goals
 
@@ -15,12 +29,12 @@ is a proposal, not a promise that these APIs already exist.
 
 ### Phase 1: media information, progress, and cancellation
 
-1. Add a typed `inspectMedia` API backed by FFprobe. Return duration, width,
+1. Done: add a typed `inspectMedia` API backed by FFprobe. Return duration, width,
    height, rotation, codecs, bitrate, frame rate, and audio/video stream data.
-2. Add an asynchronous job handle with a unique session ID, a progress stream,
+2. Done: add an asynchronous job handle with a unique session ID, a progress stream,
    a result future, and `cancel()`.
-3. Calculate percentage progress from FFmpeg statistics and probed duration.
-4. Delete partial output files when a task is cancelled or fails, unless the
+3. Done: calculate percentage progress from FFmpeg statistics and probed duration.
+4. Done: delete partial output files when a task is cancelled or fails, unless the
    caller explicitly asks to keep them.
 
 Why first: encoding can take minutes on a phone. Progress and cancellation are
@@ -29,9 +43,9 @@ job API can support all later operations.
 
 ### Phase 2: common editing operations
 
-1. `extractThumbnail`: save a JPEG/PNG frame at a timestamp with optional width
+1. Done: `extractThumbnail` saves a JPEG/PNG frame at a timestamp with optional width
    and height.
-2. `trimVideo`: accept start and duration/end. Offer an accurate re-encode mode
+2. Done: `trimVideo` accepts start and duration/end, with an accurate re-encode mode
    and a fast stream-copy mode with documented keyframe limitations.
 3. `compressVideo`: replace ambiguous percentages with presets or explicit
    `crf`, maximum dimensions, video codec, audio bitrate, and encoder preset.
@@ -108,13 +122,13 @@ platform edge cases than Phases 1 and 2.
 
 ## Suggested first release scope
 
-The smallest high-value release is:
+The proposed `0.2.0` release scope is:
 
-1. `inspectMedia`.
-2. A progress/cancellation job abstraction.
-3. `extractThumbnail`.
-4. `trimVideo` with accurate and fast modes.
-5. Unit and Android/iOS integration coverage plus complete usage examples.
+1. Done: `inspectMedia`.
+2. Done: a progress/cancellation job abstraction.
+3. Done: `extractThumbnail`.
+4. Done: `trimVideo` with accurate and fast modes.
+5. In progress: Android/iOS integration coverage plus complete usage examples.
 
 After that foundation is stable, compression presets and merge/audio helpers
 can be added without inventing a second execution model.
