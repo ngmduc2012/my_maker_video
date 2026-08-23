@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [0.2.1] - 2026-08-23
+- Restore the package artwork and the original numbered-image illustration in
+  the public README.
+- Keep all `0.2.0` APIs and runtime behavior unchanged.
+
 ## [0.2.0] - 2026-08-23
 - Add typed media inspection backed by FFprobe.
 - Add per-session progress streams and cancellation for long-running jobs.

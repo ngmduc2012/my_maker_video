@@ -7,6 +7,8 @@ _[![Support Me on Ko-fi](https://img.shields.io/badge/Donate-Ko_fi-red?logo=ko-f
 
 # MyMakerVideo
 
+![MyMakerVideo package artwork](avatar.png)
+
 Inspect and edit media, create an MP4 from a numbered PNG sequence, add an
 image/video watermark, reduce video quality, or convert a video to GIF from
 Flutter.
@@ -94,6 +96,11 @@ Future<String?> createSlideshow(String imagesDirectoryPath) async {
 The image directory must contain a consecutive numbered PNG sequence such as
 `1.png`, `2.png`, and `3.png`. Do not leave gaps in the sequence. Images should
 use the same dimensions for predictable output.
+
+The following image from the original guide shows a valid consecutively
+numbered input directory:
+
+![Numbered PNG sequence in the input directory](example/assets/image.jpeg)
 
 | Parameter | Accepted value | Meaning |
 | --- | --- | --- |
