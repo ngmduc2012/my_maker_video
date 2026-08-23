@@ -2,7 +2,9 @@
 ///
 /// Use [MyMakerVideo.ffmpegKit] for image-to-video, watermark, quality,
 /// and GIF helpers.
-import 'package:ffmpeg_kit_flutter_full_gpl/ffmpeg_kit.dart';
+library;
+
+import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:flutter/foundation.dart';
 
 part 'src/ffmpeg_kit.dart';

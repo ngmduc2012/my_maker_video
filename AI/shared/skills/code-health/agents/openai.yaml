@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Dart Code Health'
+  short_description: 'Kiểm tra code Dart/Flutter đang đổi'
+  default_prompt: 'Use $code-health to validate and safely improve the changed Dart or Flutter code without altering public behavior.'

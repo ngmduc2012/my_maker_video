@@ -1,1 +1,6 @@
-coverage/html/
+AI/
+coverage/
+build/
+example/build/
+example/.dart_tool/
+*.iml

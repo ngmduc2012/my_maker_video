@@ -2,13 +2,9 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'dart:async';
-
 import 'package:my_maker_video/my_maker_video.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,9 +17,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin my_maker_video example app'),
-        ),
+        appBar: AppBar(title: const Text('Plugin my_maker_video example app')),
         body: Center(
           child: SingleChildScrollView(
             child: Column(
@@ -63,63 +57,55 @@ class _ImagesToVideoState extends State<ImagesToVideo> {
         ),
         Text("STEP 1 | create folder input-image"),
         TextButton(
-            onPressed: () async {
-              final downloadPath = !kIsWeb && Platform.isAndroid
-                  ? await createDirectory(
-                      "/storage/emulated/0/Download/my_maker_video")
-                  : await getApplicationDocumentsDirectory();
-              inputPath = "${downloadPath.path}/input-image";
-              await createDirectory(inputPath!);
-              setState(() {});
-            },
-            child: Text("Create")),
+          onPressed: () async {
+            final downloadPath = await getExampleOutputDirectory();
+            inputPath = "${downloadPath.path}/input-image";
+            await createDirectory(inputPath!);
+            setState(() {});
+          },
+          child: Text("Create"),
+        ),
         Text(
-            "STEP 2 | input your images to folder $inputPath with name is number like image with type .png"),
+          "STEP 2 | input your images to folder $inputPath with name is number like image with type .png",
+        ),
         SizedBox(height: 400, child: Image.asset("assets/image.jpeg")),
         Text("STEP 3 | create folder output video $outputPath"),
         TextButton(
-            onPressed: () async {
-              final downloadPath = !kIsWeb && Platform.isAndroid
-                  ? await createDirectory(
-                      "/storage/emulated/0/Download/my_maker_video")
-                  : await getApplicationDocumentsDirectory();
-              outputPath = "${downloadPath.path}/video";
-              await createDirectory(outputPath!);
-              setState(() {});
-            },
-            child: Text("Create")),
-        Text("STEP 4 | allow permission save video"),
-        TextButton(
-            onPressed: () async {
-              await Permission.storage.request().isGranted;
-              await Permission.photos.request().isGranted;
-            },
-            child: Text("allow")),
+          onPressed: () async {
+            final downloadPath = await getExampleOutputDirectory();
+            outputPath = "${downloadPath.path}/video";
+            await createDirectory(outputPath!);
+            setState(() {});
+          },
+          child: Text("Create"),
+        ),
+        Text("STEP 4 | app-scoped storage needs no broad storage permission"),
         Text("STEP 5 | create video from list image $pathVideo"),
         Text("NOTE: out put file name has to be unique"),
         TextButton(
-            onPressed: () async {
-              if (outputPath != null && inputPath != null) {
-                final pathVideo =
-                    "$outputPath/image-to-video-${Random().nextInt(20)}.mp4";
+          onPressed: () async {
+            if (outputPath != null && inputPath != null) {
+              final pathVideo =
+                  "$outputPath/image-to-video-${Random().nextInt(20)}.mp4";
 
-                final result =
-                    await MyMakerVideo.ffmpegKit.convertImageDirectoryToVideo(
-                  imagesPath: inputPath!,
-                  outputVideoPath: pathVideo,
-                  // fps: 2
-                );
-                if (!mounted) return;
-                setState(() {
-                  this.pathVideo = pathVideo;
-                });
-                debugPrint("Result | ${result.message}");
-                debugPrint("Path | $pathVideo");
-              }
+              final result = await MyMakerVideo.ffmpegKit
+                  .convertImageDirectoryToVideo(
+                    imagesPath: inputPath!,
+                    outputVideoPath: pathVideo,
+                    // fps: 2
+                  );
+              if (!mounted) return;
+              setState(() {
+                this.pathVideo = pathVideo;
+              });
+              debugPrint("Result | ${result.message}");
+              debugPrint("Path | $pathVideo");
+            }
 
-              // }
-            },
-            child: Text("Create video from image")),
+            // }
+          },
+          child: Text("Create video from image"),
+        ),
         Text("STEP 6 | waiting"),
       ],
     );
@@ -129,6 +115,11 @@ class _ImagesToVideoState extends State<ImagesToVideo> {
 Future<Directory> createDirectory(String path) async {
   debugPrint("Path | $path");
   return await Directory(path).create(recursive: true);
+}
+
+Future<Directory> getExampleOutputDirectory() async {
+  final documentsDirectory = await getApplicationDocumentsDirectory();
+  return createDirectory('${documentsDirectory.path}/my_maker_video');
 }
 
 class Watermark extends StatefulWidget {
@@ -154,69 +145,65 @@ class _WatermarkState extends State<Watermark> {
         ),
         Text("STEP 1 | pick video $videoPath"),
         TextButton(
-            onPressed: () async {
-              videoPath = await pickOneVideo();
-              setState(() {});
-            },
-            child: Text("Select video")),
+          onPressed: () async {
+            videoPath = await pickOneVideo();
+            setState(() {});
+          },
+          child: Text("Select video"),
+        ),
         Text("STEP 2 | pick watermark (video or image) $watermarkPath"),
         TextButton(
-            onPressed: () async {
-              watermarkPath =
-                  await pickOneFile(allowedExtensions: ["mp4", "png"]);
-              setState(() {});
-            },
-            child: Text("Select video")),
+          onPressed: () async {
+            watermarkPath = await pickOneFile(
+              allowedExtensions: ["mp4", "png"],
+            );
+            setState(() {});
+          },
+          child: Text("Select video"),
+        ),
         Text("STEP 3 | create folder output video $outputPath"),
         TextButton(
-            onPressed: () async {
-              final downloadPath = !kIsWeb && Platform.isAndroid
-                  ? await createDirectory(
-                      "/storage/emulated/0/Download/my_maker_video")
-                  : await getApplicationDocumentsDirectory();
-              outputPath = "${downloadPath.path}/video";
-              await createDirectory(outputPath!);
-              setState(() {});
-            },
-            child: Text("Create")),
-        Text("STEP 4 | allow permission save video"),
-        TextButton(
-            onPressed: () async {
-              await Permission.storage.request().isGranted;
-              await Permission.photos.request().isGranted;
-            },
-            child: Text("allow")),
+          onPressed: () async {
+            final downloadPath = await getExampleOutputDirectory();
+            outputPath = "${downloadPath.path}/video";
+            await createDirectory(outputPath!);
+            setState(() {});
+          },
+          child: Text("Create"),
+        ),
+        Text("STEP 4 | app-scoped storage needs no broad storage permission"),
         Text("STEP 5 | create video with watermark $pathVideo"),
         TextButton(
-            onPressed: () async {
-              if (outputPath != null &&
-                  watermarkPath != null &&
-                  videoPath != null) {
-                final pathVideo =
-                    "$outputPath/watermark-${Random().nextInt(20)}.mp4";
+          onPressed: () async {
+            if (outputPath != null &&
+                watermarkPath != null &&
+                videoPath != null) {
+              final pathVideo =
+                  "$outputPath/watermark-${Random().nextInt(20)}.mp4";
 
-                final result = await MyMakerVideo.ffmpegKit.addWatermarkToVideo(
-                    watermarkPath: watermarkPath!,
-                    videoPath: videoPath!,
-                    outputPath: pathVideo,
-                    x: 20,
-                    y: 30,
-                    width: 200,
-                    height: 200
+              final result = await MyMakerVideo.ffmpegKit.addWatermarkToVideo(
+                watermarkPath: watermarkPath!,
+                videoPath: videoPath!,
+                outputPath: pathVideo,
+                x: 20,
+                y: 30,
+                width: 200,
+                height: 200,
 
-                    // fps: 2
-                    );
-                if (!mounted) return;
-                setState(() {
-                  this.pathVideo = pathVideo;
-                });
-                debugPrint("Result | ${result.message}");
-                debugPrint("Path | $pathVideo");
-              }
+                // fps: 2
+              );
+              if (!mounted) return;
+              setState(() {
+                this.pathVideo = pathVideo;
+              });
+              debugPrint("Result | ${result.message}");
+              debugPrint("Path | $pathVideo");
+            }
 
-              // }
-            },
-            child: Text("Create video from image")),
+            // }
+          },
+          child: Text("Create video from image"),
+        ),
         Text("STEP 6 | waiting"),
       ],
     );
@@ -224,18 +211,16 @@ class _WatermarkState extends State<Watermark> {
 }
 
 Future<String?> pickOneFile({List<String>? allowedExtensions}) async {
-  final FilePickerResult? result = await FilePicker.platform.pickFiles(
+  final file = await FilePicker.pickFile(
     type: allowedExtensions == null ? FileType.any : FileType.custom,
     allowedExtensions: allowedExtensions,
   );
-  return result?.files.single.path!;
+  return file?.path;
 }
 
 Future<String?> pickOneVideo() async {
-  final FilePickerResult? result = await FilePicker.platform.pickFiles(
-    type: FileType.video,
-  );
-  return result?.files.single.path!;
+  final file = await FilePicker.pickFile(type: FileType.video);
+  return file?.path;
 }
 
 class ReduceVideoQuality extends StatefulWidget {
@@ -260,54 +245,49 @@ class _ReduceVideoQualityState extends State<ReduceVideoQuality> {
         ),
         Text("STEP 1 | pick video $videoPath"),
         TextButton(
-            onPressed: () async {
-              videoPath = await pickOneVideo();
-              setState(() {});
-            },
-            child: Text("Select video")),
+          onPressed: () async {
+            videoPath = await pickOneVideo();
+            setState(() {});
+          },
+          child: Text("Select video"),
+        ),
         Text("STEP 2 | create folder output video $outputPath"),
         TextButton(
-            onPressed: () async {
-              final downloadPath = !kIsWeb && Platform.isAndroid
-                  ? await createDirectory(
-                      "/storage/emulated/0/Download/my_maker_video")
-                  : await getApplicationDocumentsDirectory();
-              outputPath = "${downloadPath.path}/video";
-              await createDirectory(outputPath!);
-              setState(() {});
-            },
-            child: Text("Create")),
-        Text("STEP 3 | allow permission save video"),
-        TextButton(
-            onPressed: () async {
-              await Permission.storage.request().isGranted;
-              await Permission.photos.request().isGranted;
-            },
-            child: Text("allow")),
+          onPressed: () async {
+            final downloadPath = await getExampleOutputDirectory();
+            outputPath = "${downloadPath.path}/video";
+            await createDirectory(outputPath!);
+            setState(() {});
+          },
+          child: Text("Create"),
+        ),
+        Text("STEP 3 | app-scoped storage needs no broad storage permission"),
         Text("STEP 4 | reduce quality of video $pathVideo"),
         TextButton(
-            onPressed: () async {
-              if (outputPath != null && videoPath != null) {
-                final pathVideo =
-                    "$outputPath/reduce-quality-${Random().nextInt(20)}.mp4";
+          onPressed: () async {
+            if (outputPath != null && videoPath != null) {
+              final pathVideo =
+                  "$outputPath/reduce-quality-${Random().nextInt(20)}.mp4";
 
-                final result = await MyMakerVideo.ffmpegKit
-                    .reduceVideoQualityByPercentage(
-                        inputPath: videoPath!,
-                        outputPath: pathVideo,
-                        qualityPercentage: 30);
+              final result = await MyMakerVideo.ffmpegKit
+                  .reduceVideoQualityByPercentage(
+                    inputPath: videoPath!,
+                    outputPath: pathVideo,
+                    qualityPercentage: 30,
+                  );
 
-                if (!mounted) return;
-                setState(() {
-                  this.pathVideo = pathVideo;
-                });
-                debugPrint("Result | ${result.message}");
-                debugPrint("Path | $pathVideo");
-              }
+              if (!mounted) return;
+              setState(() {
+                this.pathVideo = pathVideo;
+              });
+              debugPrint("Result | ${result.message}");
+              debugPrint("Path | $pathVideo");
+            }
 
-              // }
-            },
-            child: Text("Create video from image")),
+            // }
+          },
+          child: Text("Create video from image"),
+        ),
         Text("STEP 5 | waiting"),
       ],
     );
@@ -336,55 +316,49 @@ class _VideoToGifState extends State<VideoToGif> {
         ),
         Text("STEP 1 | pick video $videoPath"),
         TextButton(
-            onPressed: () async {
-              videoPath = await pickOneVideo();
-              setState(() {});
-            },
-            child: Text("Select video")),
+          onPressed: () async {
+            videoPath = await pickOneVideo();
+            setState(() {});
+          },
+          child: Text("Select video"),
+        ),
         Text("STEP 2 | create folder output video $outputPath"),
         TextButton(
-            onPressed: () async {
-              final downloadPath = !kIsWeb && Platform.isAndroid
-                  ? await createDirectory(
-                      "/storage/emulated/0/Download/my_maker_video")
-                  : await getApplicationDocumentsDirectory();
-              outputPath = "${downloadPath.path}/video";
-              await createDirectory(outputPath!);
-              setState(() {});
-            },
-            child: Text("Create")),
-        Text("STEP 3 | allow permission save video"),
-        TextButton(
-            onPressed: () async {
-              await Permission.storage.request().isGranted;
-              await Permission.photos.request().isGranted;
-            },
-            child: Text("allow")),
+          onPressed: () async {
+            final downloadPath = await getExampleOutputDirectory();
+            outputPath = "${downloadPath.path}/video";
+            await createDirectory(outputPath!);
+            setState(() {});
+          },
+          child: Text("Create"),
+        ),
+        Text("STEP 3 | app-scoped storage needs no broad storage permission"),
         Text("STEP 4 | create gif from video $pathVideo"),
         TextButton(
-            onPressed: () async {
-              if (outputPath != null && videoPath != null) {
-                final pathGif = "$outputPath/gif-${Random().nextInt(20)}.gif";
+          onPressed: () async {
+            if (outputPath != null && videoPath != null) {
+              final pathGif = "$outputPath/gif-${Random().nextInt(20)}.gif";
 
-                final result = await MyMakerVideo.ffmpegKit.createGifFromVideo(
-                  inputPath: videoPath!,
-                  outputPath: pathGif,
-                  quality: 100,
-                  scale: 3200,
-                  fps: 2,
-                );
+              final result = await MyMakerVideo.ffmpegKit.createGifFromVideo(
+                inputPath: videoPath!,
+                outputPath: pathGif,
+                quality: 100,
+                scale: 3200,
+                fps: 2,
+              );
 
-                if (!mounted) return;
-                setState(() {
-                  pathVideo = pathGif;
-                });
-                debugPrint("Result | ${result.message}");
-                debugPrint("Path | $pathGif");
-              }
+              if (!mounted) return;
+              setState(() {
+                pathVideo = pathGif;
+              });
+              debugPrint("Result | ${result.message}");
+              debugPrint("Path | $pathGif");
+            }
 
-              // }
-            },
-            child: Text("Create video from image")),
+            // }
+          },
+          child: Text("Create video from image"),
+        ),
         Text("STEP 5 | waiting"),
       ],
     );

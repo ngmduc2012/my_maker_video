@@ -11,8 +11,7 @@ class FakeReturnCode {
   bool isValueCancel() => cancel;
 
   @override
-  String toString() =>
-      'FakeReturnCode(success: $success, cancel: $cancel)';
+  String toString() => 'FakeReturnCode(success: $success, cancel: $cancel)';
 }
 
 class FakeSession implements FfmpegSession {
@@ -33,10 +32,18 @@ class CapturingExecutor implements FfmpegExecutor {
 
   final FfmpegSession _session;
   String? lastCommand;
+  List<String>? lastArguments;
 
   @override
   Future<FfmpegSession> execute(String command) async {
     lastCommand = command;
+    return _session;
+  }
+
+  @override
+  Future<FfmpegSession> executeWithArguments(List<String> arguments) async {
+    lastArguments = List<String>.unmodifiable(arguments);
+    lastCommand = arguments.join(' ');
     return _session;
   }
 }
@@ -51,8 +58,7 @@ class DummyExecutor extends FfmpegExecutor {
 }
 
 class FakeNativeSession {
-  Future<dynamic> getReturnCode() async =>
-      const FakeReturnCode(success: true);
+  Future<dynamic> getReturnCode() async => const FakeReturnCode(success: true);
   Future<String?> getOutput() async => 'native output';
 }
 
@@ -83,6 +89,31 @@ void main() {
     }
   });
 
+  test(
+    'FfmpegKitExecutor sends argument lists directly to FFmpegKit',
+    () async {
+      final previous = FfmpegKitExecutor.executeWithArgumentsImpl;
+      List<String>? capturedArguments;
+      try {
+        FfmpegKitExecutor.executeWithArgumentsImpl = (arguments) async {
+          capturedArguments = arguments;
+          return FakeNativeSession();
+        };
+
+        const executor = FfmpegKitExecutor();
+        final session = await executor.executeWithArguments(const [
+          '-i',
+          'folder with spaces/input.mp4',
+        ]);
+
+        expect(capturedArguments, ['-i', 'folder with spaces/input.mp4']);
+        expect(await session.getOutput(), 'native output');
+      } finally {
+        FfmpegKitExecutor.executeWithArgumentsImpl = previous;
+      }
+    },
+  );
+
   group('convertImageDirectoryToVideo', () {
     test('builds command and returns success', () async {
       final executor = CapturingExecutor(
@@ -98,10 +129,11 @@ void main() {
         quality: 23,
       );
 
-      const expectedCommand = '-framerate 12 -i images/%d.png '
+      const expectedCommand =
+          '-y -framerate 12 -i images/%d.png '
           '-r 30 '
           '-crf 23 -preset slow '
-          '-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" '
+          '-vf scale=trunc(iw/2)*2:trunc(ih/2)*2 '
           '-c:v libx264 -pix_fmt yuv420p -movflags +faststart out.mp4';
 
       expect(executor.lastCommand, expectedCommand);
@@ -122,15 +154,10 @@ void main() {
 
       final command = executor.lastCommand!;
       expect(command, contains('-framerate 24 -i images/%d.png'));
+      expect(command, contains('-vf scale=trunc(iw/2)*2:trunc(ih/2)*2'));
       expect(
         command,
-        contains('-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2"'),
-      );
-      expect(
-        command,
-        contains(
-          '-c:v libx264 -pix_fmt yuv420p -movflags +faststart out.mp4',
-        ),
+        contains('-c:v libx264 -pix_fmt yuv420p -movflags +faststart out.mp4'),
       );
       expect(command.contains('-r '), isFalse);
       expect(command.contains('-crf '), isFalse);
@@ -151,7 +178,7 @@ void main() {
       expect(result.message, 'Video conversion cancelled!');
     });
 
-    test('throws assertion when fps is invalid', () async {
+    test('throws range error when fps is invalid', () async {
       final executor = CapturingExecutor(
         const FakeSession(returnCode: FakeReturnCode(success: true)),
       );
@@ -163,11 +190,11 @@ void main() {
           outputVideoPath: 'out.mp4',
           fps: 0,
         ),
-        throwsAssertionError,
+        throwsRangeError,
       );
     });
 
-    test('throws assertion when quality is invalid', () async {
+    test('throws range error when quality is invalid', () async {
       final executor = CapturingExecutor(
         const FakeSession(returnCode: FakeReturnCode(success: true)),
       );
@@ -179,7 +206,7 @@ void main() {
           outputVideoPath: 'out.mp4',
           quality: 0,
         ),
-        throwsAssertionError,
+        throwsRangeError,
       );
     });
 
@@ -199,6 +226,21 @@ void main() {
 
       expect(result.isSuccess, isFalse);
       expect(result.message, contains('ffmpeg output'));
+    });
+
+    test('keeps paths with spaces as single FFmpeg arguments', () async {
+      final executor = CapturingExecutor(
+        const FakeSession(returnCode: FakeReturnCode(success: true)),
+      );
+      final kit = $FfmpegKit(executor: executor);
+
+      await kit.convertImageDirectoryToVideo(
+        imagesPath: 'input images',
+        outputVideoPath: 'output videos/out.mp4',
+      );
+
+      expect(executor.lastArguments, contains('input images/%d.png'));
+      expect(executor.lastArguments, contains('output videos/out.mp4'));
     });
   });
 
@@ -220,33 +262,30 @@ void main() {
       );
 
       const expectedCommand =
-          '-i input.mp4 -i mark.png -filter_complex '
-          '"[1:v]scale=100:200[wm];[0:v][wm]overlay=10:20" '
+          '-y -i input.mp4 -i mark.png -filter_complex '
+          '[1:v]scale=100:200[wm];[0:v][wm]overlay=10:20 '
           '-codec:a copy out.mp4';
 
       expect(executor.lastCommand, expectedCommand);
     });
 
-    test('uses overlay filter when only width is provided', () async {
+    test('requires watermark width and height together', () async {
       final executor = CapturingExecutor(
         const FakeSession(returnCode: FakeReturnCode(success: true)),
       );
       final kit = $FfmpegKit(executor: executor);
 
-      await kit.addWatermarkToVideo(
-        videoPath: 'input.mp4',
-        watermarkPath: 'mark.png',
-        outputPath: 'out.mp4',
-        x: 10,
-        y: 20,
-        width: 100,
+      await expectLater(
+        kit.addWatermarkToVideo(
+          videoPath: 'input.mp4',
+          watermarkPath: 'mark.png',
+          outputPath: 'out.mp4',
+          x: 10,
+          y: 20,
+          width: 100,
+        ),
+        throwsArgumentError,
       );
-
-      const expectedCommand =
-          '-i input.mp4 -i mark.png -filter_complex "overlay=10:20" '
-          '-codec:a copy out.mp4';
-
-      expect(executor.lastCommand, expectedCommand);
     });
 
     test('uses overlay filter when size omitted', () async {
@@ -264,7 +303,7 @@ void main() {
       );
 
       const expectedCommand =
-          '-i input.mp4 -i mark.png -filter_complex "overlay=10:20" '
+          '-y -i input.mp4 -i mark.png -filter_complex overlay=10:20 '
           '-codec:a copy out.mp4';
 
       expect(executor.lastCommand, expectedCommand);
@@ -285,7 +324,7 @@ void main() {
       );
 
       expect(result.isSuccess, isFalse);
-      expect(result.message, contains('Failed to add watermark'));
+      expect(result.message, contains('Add watermark failed'));
     });
   });
 
@@ -303,10 +342,11 @@ void main() {
       );
 
       const expectedCommand =
-          '-i input.mp4 -crf 41 -preset fast -b:v 1850k -codec:a copy out.mp4';
+          '-y -i input.mp4 -crf 41 -preset fast -b:v 1850k -codec:a copy out.mp4';
 
       expect(executor.lastCommand, expectedCommand);
       expect(result.isSuccess, isTrue);
+      expect(result.message, 'Video quality reduced successfully!');
     });
 
     test('returns failure when return code is not success', () async {
@@ -322,7 +362,24 @@ void main() {
       );
 
       expect(result.isSuccess, isFalse);
-      expect(result.message, contains('reduceVideoQualityByPercentage'));
+      expect(result.message, contains('Reduce video quality failed'));
+    });
+
+    test('rejects a quality percentage outside 0 to 100', () async {
+      final kit = $FfmpegKit(
+        executor: CapturingExecutor(
+          const FakeSession(returnCode: FakeReturnCode(success: true)),
+        ),
+      );
+
+      await expectLater(
+        kit.reduceVideoQualityByPercentage(
+          inputPath: 'input.mp4',
+          outputPath: 'out.mp4',
+          qualityPercentage: 101,
+        ),
+        throwsRangeError,
+      );
     });
   });
 
@@ -341,10 +398,11 @@ void main() {
       );
 
       const expectedCommand =
-          '-i input.mp4 -vf "fps=1.5,scale=320:-1:flags=lanczos" -q:v 10 out.gif';
+          '-y -i input.mp4 -vf fps=1.5,scale=320:-1:flags=lanczos -q:v 10 out.gif';
 
       expect(executor.lastCommand, expectedCommand);
       expect(result.isSuccess, isTrue);
+      expect(result.message, 'GIF created successfully!');
     });
 
     test('returns failure when return code is not success', () async {
@@ -362,11 +420,38 @@ void main() {
       );
 
       const expectedCommand =
-          '-i input.mp4 -vf "fps=2.0,scale=200:-1:flags=lanczos" -q:v 5 out.gif';
+          '-y -i input.mp4 -vf fps=2.0,scale=200:-1:flags=lanczos -q:v 5 out.gif';
 
       expect(executor.lastCommand, expectedCommand);
       expect(result.isSuccess, isFalse);
-      expect(result.message, contains('Failed to create GIF'));
+      expect(result.message, contains('Create GIF failed'));
+    });
+
+    test('rejects invalid GIF settings', () async {
+      final kit = $FfmpegKit(
+        executor: CapturingExecutor(
+          const FakeSession(returnCode: FakeReturnCode(success: true)),
+        ),
+      );
+
+      await expectLater(
+        kit.createGifFromVideo(
+          inputPath: 'input.mp4',
+          outputPath: 'out.gif',
+          fps: 0,
+          quality: 10,
+        ),
+        throwsRangeError,
+      );
+      await expectLater(
+        kit.createGifFromVideo(
+          inputPath: 'input.mp4',
+          outputPath: 'out.gif',
+          fps: 2,
+          quality: 32,
+        ),
+        throwsRangeError,
+      );
     });
   });
 }

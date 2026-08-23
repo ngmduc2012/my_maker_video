@@ -7,134 +7,198 @@ _[![Support Me on Ko-fi](https://img.shields.io/badge/Donate-Ko_fi-red?logo=ko-f
 
 # MyMakerVideo
 
-Effortlessly create videos from a sequence of images, add watermarks to videos with precise positioning, reduce video quality to optimize file sizes, and convert videos into high-quality GIFs. MyMakerVideo streamlines these tasks for your Flutter projects with powerful, fast, and customizable functionality.
+Create an MP4 from a numbered PNG sequence, add an image/video watermark,
+reduce video quality, or convert a video to GIF from Flutter.
+
+MyMakerVideo supports Android and iOS and uses a maintained Full-GPL FFmpegKit
+build with `libx264`.
+
+## Requirements
+
+- Flutter 3.47.1 or newer
+- Dart 3.13.1 or newer
+- Android API 24 or newer
+- iOS 15.0 or newer
+
 ## Installation
 
-Add the following dependency to your `pubspec.yaml` file:
+Run:
 
-```yaml
-my_maker_video: ^latest_version
+```sh
+flutter pub add my_maker_video
+flutter pub add path_provider
 ```
 
-Then, run the following command:
+Then import the packages:
 
-```bash
-flutter pub get
+```dart
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:my_maker_video/my_maker_video.dart';
+import 'package:path_provider/path_provider.dart';
 ```
 
-### Android Configuration
-Add the following configuration to your `android/app/build.gradle` file:
+`path_provider` is only used in the examples below to create an app-scoped
+output directory. It is not a dependency of MyMakerVideo.
 
-```gradle
-defaultConfig {
-    applicationId = "com.wongcoupon.my_maker_video.my_maker_video_example"
-    // Update these values as needed for your application.
-    minSdk = 24
-    targetSdk = flutter.targetSdkVersion
-    versionCode = flutter.versionCode
-    versionName = flutter.versionName
+## Storage and permissions
+
+MyMakerVideo only reads and writes the file paths supplied by your app. It does
+not require Android `MANAGE_EXTERNAL_STORAGE`, legacy read/write storage
+permissions, or iOS photo-library permission by itself.
+
+Prefer files returned by a system picker and write output to an app-scoped
+directory such as the directory returned by `path_provider`. If your app itself
+opens the photo library or another protected source, declare only the permission
+required by that feature.
+
+## Quick start
+
+Every helper returns `({bool isSuccess, String message})`. Always `await` the
+operation and check the result:
+
+```dart
+Future<Directory> createVideoOutputDirectory() async {
+  final documents = await getApplicationDocumentsDirectory();
+  return Directory('${documents.path}/my_maker_video').create(recursive: true);
+}
+
+Future<String?> createSlideshow(String imagesDirectoryPath) async {
+  final outputDirectory = await createVideoOutputDirectory();
+  final outputPath = '${outputDirectory.path}/slideshow.mp4';
+
+  try {
+    final result = await MyMakerVideo.ffmpegKit.convertImageDirectoryToVideo(
+      imagesPath: imagesDirectoryPath,
+      outputVideoPath: outputPath,
+      framerate: 24,
+      fps: 30,
+      quality: 23,
+    );
+
+    if (!result.isSuccess) {
+      debugPrint(result.message);
+      return null;
+    }
+
+    return outputPath;
+  } on ArgumentError catch (error) {
+    debugPrint('Invalid video option: $error');
+    return null;
+  }
 }
 ```
 
-Add these permissions to your `AndroidManifest.xml` file:
+The image directory must contain a consecutive numbered PNG sequence such as
+`1.png`, `2.png`, and `3.png`. Do not leave gaps in the sequence. Images should
+use the same dimensions for predictable output.
 
-```xml
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-<uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
-```
+| Parameter | Accepted value | Meaning |
+| --- | --- | --- |
+| `framerate` | Positive integer | Number of input images shown each second |
+| `fps` | Positive integer or `null` | Optional output frame rate |
+| `quality` | `1` to `51` or `null` | H.264 CRF; lower is clearer and usually larger |
 
-### iOS Configuration
-Add the following keys to your `Info.plist` file:
+The output is H.264 MP4 with even dimensions, `yuv420p` pixel format, and
+fast-start metadata for broad player compatibility.
 
-```xml
-<key>NSPhotoLibraryUsageDescription</key>
-<string>We need access to your photo library to pick files.</string>
-<key>NSDocumentDirectoryUsageDescription</key>
-<string>We need access to your documents to pick files.</string>
-<key>UIFileSharingEnabled</key>
-<true/>
-<key>LSSupportsOpeningDocumentsInPlace</key>
-<true/>
-```
-
-Ensure the platform version in your `ios/Podfile` is set to:
-
-```ruby
-platform :ios, '13.0'
-```
-
-## Usage
-
-Import the package:
+## Add a watermark
 
 ```dart
-import 'package:my_maker_video/my_maker_video.dart';
-```
-
-### Permissions
-Ensure that your app has the required write permissions.
-
-### Features
-
-#### 1. Create a Video from a Sequence of Images
-Ensure that the `path/to/images` directory contains images named with natural numbers and `.png` format, as shown in the example:
-
-![Example Image](example/assets/image.jpeg)
-
-The `path/to/videoOutput.mp4` must have a unique name to avoid overwriting existing files.
-
-```dart
-final result = MyMakerVideo.ffmpegKit.convertImageDirectoryToVideo(
-    imagesPath: "path/to/images",
-    outputVideoPath: "path/to/videoOutput.mp4",
-    // fps: 2
+final result = await MyMakerVideo.ffmpegKit.addWatermarkToVideo(
+  videoPath: inputVideoPath,
+  watermarkPath: watermarkPath,
+  outputPath: outputVideoPath,
+  x: 20,
+  y: 30,
+  width: 200,
+  height: 200,
 );
 ```
 
-> **Note:** If the video is large, please allow some time for processing.
+Pass both `width` and `height` to resize the watermark, or omit both to keep its
+original size. Coordinates start at the top-left corner of the video. The input
+audio stream is copied to the output without re-encoding.
 
-#### 2. Add a Watermark to a Video
+## Reduce video quality
 
 ```dart
-final result = MyMakerVideo.ffmpegKit.addWatermarkToVideo(
-    watermarkPath: watermarkPath!, // Path to the watermark image or video
-    videoPath: videoPath!,         // Path to the video to watermark
-    outputPath: pathVideo,         // Path to save the output video
-    x: 20,                         // X-coordinate (top-left origin)
-    y: 30,                         // Y-coordinate
-    width: 200,                    // Width of the watermark
-    height: 200                    // Height of the watermark
+final result =
+    await MyMakerVideo.ffmpegKit.reduceVideoQualityByPercentage(
+  inputPath: inputVideoPath,
+  outputPath: outputVideoPath,
+  qualityPercentage: 30,
 );
 ```
 
-#### 3. Reduce Video Quality
+`qualityPercentage` accepts 0 to 100, where 100 keeps the highest quality used
+by this helper and 0 produces the lowest. This is a convenient quality scale,
+not an estimate of the final file-size reduction.
+
+## Create a GIF
 
 ```dart
-final result = MyMakerVideo.ffmpegKit.reduceVideoQualityByPercentage(
-    inputPath: videoPath!,        // Path to the input video
-    outputPath: pathVideo,        // Path to save the output video
-    qualityPercentage: 30         // Percentage to reduce quality
+final result = await MyMakerVideo.ffmpegKit.createGifFromVideo(
+  inputPath: inputVideoPath,
+  outputPath: outputGifPath,
+  fps: 2,
+  quality: 10,
+  scale: 320,
 );
 ```
 
-#### 4. Create a GIF from a Video
+GIF `quality` accepts 1 to 31; a lower value means higher quality. `fps` and
+`scale` must be greater than zero.
 
-```dart
-final result = MyMakerVideo.ffmpegKit.createGifFromVideo(
-    inputPath: videoPath!,        // Path to the input video
-    outputPath: pathGif,          // Path to save the output GIF
-    quality: 100,                 // Quality of the GIF
-    scale: 3200,                  // Scale of the GIF
-    fps: 2,                       // Frames per second
-);
-```
+## Results and errors
 
-To learn more about what I've done in the plugin, please check out my article 
-[https://wong-coupon.gitbook.io/flutter/media/ffmpeg-flutter](https://wong-coupon.gitbook.io/flutter/media/ffmpeg-flutter)
+- A valid FFmpeg operation returns a result record. Check `isSuccess`; when it
+  is false, `message` contains cancellation/failure information and FFmpeg
+  output when available.
+- Invalid paths or parameter ranges throw `ArgumentError` or `RangeError`
+  before native processing starts. Catch `ArgumentError` at your UI boundary
+  if values can come from users.
+- Output files are overwritten when they already exist.
+- Paths containing spaces and quote characters are passed to FFmpeg as
+  individual arguments.
+- Processing is asynchronous, but video encoding is CPU-intensive. Disable
+  duplicate submit actions in the UI until the returned future completes.
 
-## Developer Team
-For any comments or feedback, please contact us:
+## Common problems
+
+### The image sequence cannot be read
+
+Check that the directory exists, every file is a PNG, names are consecutive
+numbers, and your app can read each path.
+
+### FFmpeg returns a codec or container error
+
+Keep the output extension consistent with the intended format (`.mp4` for
+video and `.gif` for GIF). Some source audio codecs cannot be copied into every
+container; the returned FFmpeg log contains the exact cause.
+
+### The app cannot access a selected file
+
+Use a system picker and copy the selected file to an app-scoped directory when
+the platform only grants temporary access. The package does not request storage
+or photo-library permissions on behalf of the app.
+
+See [the step-by-step guide](doc/USAGE.md) for complete examples and
+[the feature roadmap](doc/FEATURE_ROADMAP.md) for planned progress, metadata,
+editing, audio, and GIF improvements.
+
+## License notice
+
+The Dart wrapper in this repository is MIT licensed. Its
+`ffmpeg_kit_flutter_new` dependency is a Full-GPL FFmpeg build because these
+helpers require `libx264`. Review the dependency's GPL terms and your app's
+distribution obligations before release. This notice is not legal advice.
+
+For more background, see the original article:
+[FFmpeg Flutter](https://wong-coupon.gitbook.io/flutter/media/ffmpeg-flutter).
+
+## Developer team
+
 - [ThaoDoan](https://github.com/mia140602)
 - [DucNguyen](https://github.com/ngmduc2012)

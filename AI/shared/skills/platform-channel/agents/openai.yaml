@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Platform Channel'
+  short_description: 'Giữ contract Flutter plugin nhất quán'
+  default_prompt: 'Use $platform-channel to review and update the Dart and native/web sides of this Flutter plugin contract.'

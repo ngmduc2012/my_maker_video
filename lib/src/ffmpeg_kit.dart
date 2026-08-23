@@ -3,6 +3,11 @@ part of '../my_maker_video.dart';
 /// Signature for executing an FFmpeg command.
 typedef FfmpegExecuteFn = Future<dynamic> Function(String command);
 
+/// Signature for executing an FFmpeg argument list without reparsing paths.
+typedef FfmpegExecuteArgumentsFn = Future<dynamic> Function(
+  List<String> arguments,
+);
+
 /// Minimal session interface for FFmpeg results.
 abstract class FfmpegSession {
   /// Returns the underlying FFmpeg return code.
@@ -19,6 +24,14 @@ abstract class FfmpegExecutor {
 
   /// Executes the given command and returns a session.
   Future<FfmpegSession> execute(String command);
+
+  /// Executes FFmpeg with pre-split [arguments].
+  ///
+  /// Existing custom executors only need to implement [execute]. The default
+  /// implementation serializes the arguments for backwards compatibility.
+  Future<FfmpegSession> executeWithArguments(List<String> arguments) {
+    return execute(_commandFromArguments(arguments));
+  }
 }
 
 /// Wraps the native FFmpegKit session.
@@ -44,9 +57,20 @@ class FfmpegKitExecutor implements FfmpegExecutor {
   @visibleForTesting
   static FfmpegExecuteFn executeImpl = FFmpegKit.execute;
 
+  /// Overridable argument-list entrypoint for tests.
+  @visibleForTesting
+  static FfmpegExecuteArgumentsFn executeWithArgumentsImpl =
+      FFmpegKit.executeWithArguments;
+
   @override
   Future<FfmpegSession> execute(String command) async {
     final session = await executeImpl(command);
+    return FfmpegKitSession(session);
+  }
+
+  @override
+  Future<FfmpegSession> executeWithArguments(List<String> arguments) async {
+    final session = await executeWithArgumentsImpl(arguments);
     return FfmpegKitSession(session);
   }
 }
@@ -55,13 +79,16 @@ class FfmpegKitExecutor implements FfmpegExecutor {
 class $FfmpegKit {
   /// Creates a helper with an optional custom executor (for tests).
   const $FfmpegKit({FfmpegExecutor executor = const FfmpegKitExecutor()})
-      : _executor = executor;
+    : this._(executor);
+
+  const $FfmpegKit._(this._executor);
 
   final FfmpegExecutor _executor;
-/*
-   Learn more: https://pub.dev/packages/ffmpeg_kit_flutter_full_gpl
+  /*
+   Learn more: https://pub.dev/packages/ffmpeg_kit_flutter_new
 
-   Functions is supported at https://github.com/arthenica/ffmpeg-kit/wiki/Packages
+   The maintained package bundles the Full-GPL build because these helpers use
+   libx264. Applications using this package must comply with the GPL terms.
 
    Thay thế cho thư viện gify https://pub.dev/packages/gify, gify sử dụng các tương tự nhưng khá chậm
 */
@@ -77,11 +104,13 @@ class $FfmpegKit {
     int? fps,
     int? quality,
   }) async {
-    var isSuccess = false;
-    var message = "";
-
-    if (fps != null) assert(fps > 0);
-    if (quality != null) assert(quality > 0);
+    _validatePath(imagesPath, 'imagesPath');
+    _validatePath(outputVideoPath, 'outputVideoPath');
+    _validatePositive(framerate, 'framerate');
+    if (fps != null) _validatePositive(fps, 'fps');
+    if (quality != null) {
+      RangeError.checkValueInInterval(quality, 1, 51, 'quality');
+    }
 
     // final command = '-framerate $framerate -i $imagesPath/%d.png '
     //     '-c:v libx264 -pix_fmt yuv420p -movflags +faststart $outputVideoPath';
@@ -89,29 +118,31 @@ class $FfmpegKit {
     /*
     -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2": This filter scales the width (iw) and height (ih) of the images to the nearest even number, ensuring they are divisible by 2. This adjustment is necessary for compatibility with the H.264 encoder.
      */
-    final command = '-framerate $framerate -i $imagesPath/%d.png '
-        '${fps != null ? "-r $fps" : ""} '
-        '${quality != null ? "-crf $quality -preset slow" : ""} '
-        '-vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" '
-        // '-vf "scale=3200:-1:flags=lanczos" '
-        '-c:v libx264 -pix_fmt yuv420p -movflags +faststart $outputVideoPath';
+    final arguments = <String>[
+      '-y',
+      '-framerate',
+      '$framerate',
+      '-i',
+      '${_withoutTrailingSeparator(imagesPath)}/%d.png',
+      if (fps != null) ...['-r', '$fps'],
+      if (quality != null) ...['-crf', '$quality', '-preset', 'slow'],
+      '-vf',
+      'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+      // '-vf', 'scale=3200:-1:flags=lanczos',
+      '-c:v',
+      'libx264',
+      '-pix_fmt',
+      'yuv420p',
+      '-movflags',
+      '+faststart',
+      outputVideoPath,
+    ];
 
-    await _executor.execute(command).then((session) async {
-      final returnCode = await session.getReturnCode();
-
-      if (returnCode?.isValueSuccess() ?? false) {
-        message = 'Video conversion successful!';
-        isSuccess = true;
-      } else if (returnCode?.isValueCancel() ?? false) {
-        message = 'Video conversion cancelled!';
-      } else {
-        final output = await session.getOutput();
-        message =
-            'Video conversion failed with return code $returnCode | log in $output';
-      }
-    }).whenComplete(() {});
-
-    return (isSuccess: isSuccess, message: message);
+    return _run(
+      arguments,
+      operation: 'Video conversion',
+      successMessage: 'Video conversion successful!',
+    );
   }
 
   /// Adds a watermark image/video to an existing video.
@@ -124,34 +155,53 @@ class $FfmpegKit {
     int? width, // Chiều rộng watermark (nếu muốn thay đổi kích thước)
     int? height, // Chiều cao watermark (nếu muốn thay đổi kích thước)
   }) async {
-    var isSuccess = false;
-    var message = "";
+    _validatePath(videoPath, 'videoPath');
+    _validatePath(watermarkPath, 'watermarkPath');
+    _validatePath(outputPath, 'outputPath');
+    if ((width == null) != (height == null)) {
+      throw ArgumentError('width and height must be provided together.');
+    }
+    if (width != null) _validatePositive(width, 'width');
+    if (height != null) _validatePositive(height, 'height');
 
     // Lệnh FFmpeg
     final scaleFilter = (width != null && height != null)
         ? "[1:v]scale=$width:$height[wm];[0:v][wm]overlay=$x:$y"
         : "overlay=$x:$y";
-    final command =
-        '-i $videoPath -i $watermarkPath -filter_complex "$scaleFilter" -codec:a copy $outputPath';
+    final arguments = <String>[
+      '-y',
+      '-i',
+      videoPath,
+      '-i',
+      watermarkPath,
+      '-filter_complex',
+      scaleFilter,
+      '-codec:a',
+      'copy',
+      outputPath,
+    ];
 
-    await _executor.execute(command).then((session) async {
-      final returnCode = await session.getReturnCode();
-      if (returnCode?.isValueSuccess() ?? false) {
-        message = "Watermark added successfully!";
-        isSuccess = true;
-      } else {
-        message = "Failed to add watermark with return code $returnCode";
-      }
-    });
-
-    return (isSuccess: isSuccess, message: message);
+    return _run(
+      arguments,
+      operation: 'Add watermark',
+      successMessage: 'Watermark added successfully!',
+    );
   }
 
   /// Reduces video quality using a percentage mapped to CRF/bitrate.
-  Future<({bool isSuccess, String message})> reduceVideoQualityByPercentage(
-      {required String inputPath,
-      required String outputPath,
-      required double qualityPercentage}) async {
+  Future<({bool isSuccess, String message})> reduceVideoQualityByPercentage({
+    required String inputPath,
+    required String outputPath,
+    required double qualityPercentage,
+  }) async {
+    _validatePath(inputPath, 'inputPath');
+    _validatePath(outputPath, 'outputPath');
+    if (!qualityPercentage.isFinite ||
+        qualityPercentage < 0 ||
+        qualityPercentage > 100) {
+      throw RangeError.range(qualityPercentage, 0, 100, 'qualityPercentage');
+    }
+
     // Map the quality percentage to a CRF value
     // Assuming 100% quality maps to CRF 18 (high quality) and 0% maps to CRF 51 (very low quality)
     final crfValue = (51 - 18) * (1 - qualityPercentage / 100) + 18;
@@ -165,23 +215,26 @@ class $FfmpegKit {
         ((maxBitrate - minBitrate) * (qualityPercentage / 100) + minBitrate)
             .toInt();
 
-    final command =
-        '-i $inputPath -crf ${crfValue.toInt()} -preset $preset -b:v ${bitrate}k -codec:a copy $outputPath';
+    final arguments = <String>[
+      '-y',
+      '-i',
+      inputPath,
+      '-crf',
+      '${crfValue.toInt()}',
+      '-preset',
+      preset,
+      '-b:v',
+      '${bitrate}k',
+      '-codec:a',
+      'copy',
+      outputPath,
+    ];
 
-    var isSuccess = false;
-    var message = "";
-    await _executor.execute(command).then((session) async {
-      final returnCode = await session.getReturnCode();
-      if (returnCode?.isValueSuccess() ?? false) {
-        message = "Watermark added successfully!";
-        isSuccess = true;
-      } else {
-        message =
-            "Failed to reduceVideoQualityByPercentage with return code $returnCode";
-      }
-    });
-
-    return (isSuccess: isSuccess, message: message);
+    return _run(
+      arguments,
+      operation: 'Reduce video quality',
+      successMessage: 'Video quality reduced successfully!',
+    );
   }
 
   /*
@@ -198,24 +251,93 @@ class $FfmpegKit {
     required int quality,
     int scale = 320,
   }) async {
+    _validatePath(inputPath, 'inputPath');
+    _validatePath(outputPath, 'outputPath');
+    if (!fps.isFinite || fps <= 0) {
+      throw RangeError.value(fps, 'fps', 'Must be a positive finite value.');
+    }
+    RangeError.checkValueInInterval(quality, 1, 31, 'quality');
+    _validatePositive(scale, 'scale');
+
     // The quality parameter for GIFs is typically controlled by the `-q:v` option
     // Lower values mean better quality (e.g., 1 is high quality, 31 is low quality)
-    final command =
-        '-i $inputPath -vf "fps=$fps,scale=$scale:-1:flags=lanczos" -q:v $quality $outputPath';
+    final arguments = <String>[
+      '-y',
+      '-i',
+      inputPath,
+      '-vf',
+      'fps=$fps,scale=$scale:-1:flags=lanczos',
+      '-q:v',
+      '$quality',
+      outputPath,
+    ];
 
-    var isSuccess = false;
-    var message = "";
-    await _executor.execute(command).then((session) async {
-      final returnCode = await session.getReturnCode();
-      if (returnCode?.isValueSuccess() ?? false) {
-        message = "Watermark added successfully!";
-        isSuccess = true;
-      } else {
-        message = "Failed to create GIF with return code $returnCode";
-      }
-    });
-    return (isSuccess: isSuccess, message: message);
+    return _run(
+      arguments,
+      operation: 'Create GIF',
+      successMessage: 'GIF created successfully!',
+    );
   }
+
+  Future<({bool isSuccess, String message})> _run(
+    List<String> arguments, {
+    required String operation,
+    required String successMessage,
+  }) async {
+    final session = await _executor.executeWithArguments(arguments);
+    final returnCode = await session.getReturnCode();
+
+    if (returnCode?.isValueSuccess() ?? false) {
+      return (isSuccess: true, message: successMessage);
+    }
+
+    if (returnCode?.isValueCancel() ?? false) {
+      return (isSuccess: false, message: '$operation cancelled!');
+    }
+
+    final output = await session.getOutput();
+    final logSuffix = output == null || output.trim().isEmpty
+        ? ''
+        : ' | FFmpeg log: $output';
+    return (
+      isSuccess: false,
+      message: '$operation failed with return code $returnCode$logSuffix',
+    );
+  }
+}
+
+void _validatePath(String path, String name) {
+  if (path.trim().isEmpty) {
+    throw ArgumentError.value(path, name, 'Must not be empty.');
+  }
+}
+
+void _validatePositive(int value, String name) {
+  if (value <= 0) {
+    throw RangeError.value(value, name, 'Must be greater than zero.');
+  }
+}
+
+String _withoutTrailingSeparator(String path) {
+  return path.endsWith('/') || path.endsWith('\\')
+      ? path.substring(0, path.length - 1)
+      : path;
+}
+
+String _commandFromArguments(List<String> arguments) {
+  return arguments.map(_quoteCommandArgument).join(' ');
+}
+
+String _quoteCommandArgument(String argument) {
+  if (argument.isEmpty) return "''";
+  if (!argument.contains(RegExp(r'''[\s'\"]'''))) return argument;
+  if (!argument.contains("'")) return "'$argument'";
+  if (!argument.contains('"')) return '"$argument"';
+  throw ArgumentError.value(
+    argument,
+    'arguments',
+    'A legacy string executor cannot encode an argument containing both quote types.',
+  );
 }
 
 /// Part 2: For handle data like: '42'.parseInt()

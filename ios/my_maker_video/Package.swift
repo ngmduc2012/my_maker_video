@@ -6,16 +6,20 @@ import PackageDescription
 let package = Package(
   name: "my_maker_video",
   platforms: [
-    .iOS("12.0"),
+    .iOS("15.0"),
   ],
   products: [
-    .library(name: "my_maker_video", targets: ["my_maker_video"]),
+    .library(name: "my-maker-video", targets: ["my_maker_video"]),
   ],
-  dependencies: [],
+  dependencies: [
+    .package(name: "FlutterFramework", path: "../FlutterFramework"),
+  ],
   targets: [
     .target(
       name: "my_maker_video",
-      dependencies: [],
+      dependencies: [
+        .product(name: "FlutterFramework", package: "FlutterFramework"),
+      ],
       resources: [
         .process("PrivacyInfo.xcprivacy"),
       ]
