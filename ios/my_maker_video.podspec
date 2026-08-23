@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'my_maker_video'
-  s.version          = '0.1.0'
+  s.version          = '0.2.0-dev.1'
   s.summary          = 'Flutter video processing helpers backed by FFmpeg.'
   s.description      = <<-DESC
 Create videos from image sequences, add watermarks, reduce video quality,

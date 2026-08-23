@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:my_maker_video/my_maker_video.dart';
 
@@ -58,8 +60,148 @@ class DummyExecutor extends FfmpegExecutor {
 }
 
 class FakeNativeSession {
+  FakeNativeSession({this.sessionId = 73});
+
+  final int sessionId;
+  bool cancelled = false;
+
   Future<dynamic> getReturnCode() async => const FakeReturnCode(success: true);
   Future<String?> getOutput() async => 'native output';
+  int? getSessionId() => sessionId;
+  Future<void> cancel() async => cancelled = true;
+}
+
+class CancellableFakeSession
+    implements FfmpegSession, CancellableFfmpegSession {
+  CancellableFakeSession({
+    required this.returnCode,
+    this.output,
+    this.sessionId = 42,
+  });
+
+  final FakeReturnCode returnCode;
+  final String? output;
+  final int sessionId;
+  bool cancelled = false;
+
+  @override
+  Future<dynamic> getReturnCode() async => returnCode;
+
+  @override
+  Future<String?> getOutput() async => output;
+
+  @override
+  int? getSessionId() => sessionId;
+
+  @override
+  Future<void> cancel() async => cancelled = true;
+}
+
+class FakeStatistics implements FfmpegStatistics {
+  const FakeStatistics({
+    this.sessionId = 42,
+    this.videoFrameNumber = 30,
+    this.videoFps = 30,
+    this.sizeBytes = 1024,
+    this.timeInMilliseconds = 1000,
+    this.bitrate = 800,
+    this.speed = 1.5,
+  });
+
+  @override
+  final int sessionId;
+
+  @override
+  final int videoFrameNumber;
+
+  @override
+  final double videoFps;
+
+  @override
+  final int sizeBytes;
+
+  @override
+  final int timeInMilliseconds;
+
+  @override
+  final double bitrate;
+
+  @override
+  final double speed;
+}
+
+class FakeNativeStatistics {
+  int getSessionId() => 73;
+  int getVideoFrameNumber() => 30;
+  double getVideoFps() => 30;
+  int getSize() => 2048;
+  int getTime() => 500;
+  double getBitrate() => 900;
+  double getSpeed() => 2;
+}
+
+class AsyncCapturingExecutor implements FfmpegExecutor, AsyncFfmpegExecutor {
+  AsyncCapturingExecutor(this.session);
+
+  final CancellableFakeSession session;
+  List<String>? lastArguments;
+  void Function(FfmpegSession session)? _onComplete;
+  void Function(FfmpegStatistics statistics)? _onStatistics;
+
+  @override
+  Future<FfmpegSession> execute(String command) async => session;
+
+  @override
+  Future<FfmpegSession> executeWithArguments(List<String> arguments) async {
+    lastArguments = List<String>.unmodifiable(arguments);
+    return session;
+  }
+
+  @override
+  Future<FfmpegSession> executeWithArgumentsAsync(
+    List<String> arguments, {
+    void Function(FfmpegSession session)? onComplete,
+    void Function(FfmpegStatistics statistics)? onStatistics,
+  }) async {
+    lastArguments = List<String>.unmodifiable(arguments);
+    _onComplete = onComplete;
+    _onStatistics = onStatistics;
+    return session;
+  }
+
+  void emit(FfmpegStatistics statistics) => _onStatistics?.call(statistics);
+
+  void complete() => _onComplete?.call(session);
+}
+
+class FakeProbeSession implements FfmpegProbeSession {
+  const FakeProbeSession({
+    this.properties,
+    this.returnCode = const FakeReturnCode(success: true),
+    this.output,
+  });
+
+  final Map<dynamic, dynamic>? properties;
+  final FakeReturnCode returnCode;
+  final String? output;
+
+  @override
+  Future<dynamic> getReturnCode() async => returnCode;
+
+  @override
+  Future<String?> getOutput() async => output;
+
+  @override
+  Map<dynamic, dynamic>? getMediaProperties() => properties;
+}
+
+class FakeProbeExecutor implements FfmpegProbeExecutor {
+  const FakeProbeExecutor(this.session);
+
+  final FfmpegProbeSession session;
+
+  @override
+  Future<FfmpegProbeSession> inspect(String path) async => session;
 }
 
 void main() {
@@ -113,6 +255,111 @@ void main() {
       }
     },
   );
+
+  test('FfmpegKitExecutor adapts async sessions and statistics', () async {
+    final previous = FfmpegKitExecutor.executeWithArgumentsAsyncImpl;
+    final nativeSession = FakeNativeSession();
+    FfmpegSession? completedSession;
+    FfmpegStatistics? receivedStatistics;
+    try {
+      FfmpegKitExecutor.executeWithArgumentsAsyncImpl =
+          (arguments, completeCallback, statisticsCallback) async {
+            statisticsCallback?.call(FakeNativeStatistics());
+            completeCallback?.call(nativeSession);
+            return nativeSession;
+          };
+
+      const executor = FfmpegKitExecutor();
+      final session = await executor.executeWithArgumentsAsync(
+        const ['-i', 'input.mp4'],
+        onComplete: (value) => completedSession = value,
+        onStatistics: (value) => receivedStatistics = value,
+      );
+
+      expect(session, isA<CancellableFfmpegSession>());
+      expect(completedSession, isA<FfmpegKitSession>());
+      expect(receivedStatistics?.sessionId, 73);
+      expect(receivedStatistics?.timeInMilliseconds, 500);
+      await (session as CancellableFfmpegSession).cancel();
+      expect(nativeSession.cancelled, isTrue);
+    } finally {
+      FfmpegKitExecutor.executeWithArgumentsAsyncImpl = previous;
+    }
+  });
+
+  group('inspectMedia', () {
+    test('parses container, video, audio, frame rate, and rotation', () async {
+      const probe = FakeProbeSession(
+        properties: {
+          'format': {
+            'filename': '/media/input.mp4',
+            'format_name': 'mov,mp4',
+            'format_long_name': 'QuickTime / MOV',
+            'duration': '2.500000',
+            'size': '4096',
+            'bit_rate': '1200000',
+            'tags': {'title': 'Demo'},
+          },
+          'streams': [
+            {
+              'index': 0,
+              'codec_type': 'video',
+              'codec_name': 'h264',
+              'codec_long_name': 'H.264',
+              'width': 1920,
+              'height': 1080,
+              'avg_frame_rate': '30000/1001',
+              'side_data_list': [
+                {'rotation': -90},
+              ],
+            },
+            {
+              'index': 1,
+              'codec_type': 'audio',
+              'codec_name': 'aac',
+              'sample_rate': '44100',
+              'channel_layout': 'stereo',
+            },
+          ],
+        },
+      );
+      final kit = $FfmpegKit(probeExecutor: FakeProbeExecutor(probe));
+
+      final result = await kit.inspectMedia(inputPath: 'input.mp4');
+
+      expect(result.isSuccess, isTrue);
+      expect(result.mediaInfo?.path, '/media/input.mp4');
+      expect(result.mediaInfo?.duration, const Duration(milliseconds: 2500));
+      expect(result.mediaInfo?.sizeBytes, 4096);
+      expect(result.mediaInfo?.bitrate, 1200000);
+      expect(result.mediaInfo?.tags, {'title': 'Demo'});
+      expect(result.mediaInfo?.hasVideo, isTrue);
+      expect(result.mediaInfo?.hasAudio, isTrue);
+      expect(result.mediaInfo?.videoStream?.codec, 'h264');
+      expect(result.mediaInfo?.videoStream?.width, 1920);
+      expect(
+        result.mediaInfo?.videoStream?.averageFrameRate,
+        closeTo(29.970, 0.001),
+      );
+      expect(result.mediaInfo?.videoStream?.rotationDegrees, -90);
+      expect(result.mediaInfo?.audioStream?.sampleRate, 44100);
+    });
+
+    test('returns FFprobe output when inspection fails', () async {
+      const probe = FakeProbeSession(
+        properties: null,
+        returnCode: FakeReturnCode(),
+        output: 'invalid media',
+      );
+      final kit = $FfmpegKit(probeExecutor: FakeProbeExecutor(probe));
+
+      final result = await kit.inspectMedia(inputPath: 'broken.mp4');
+
+      expect(result.isSuccess, isFalse);
+      expect(result.mediaInfo, isNull);
+      expect(result.message, contains('invalid media'));
+    });
+  });
 
   group('convertImageDirectoryToVideo', () {
     test('builds command and returns success', () async {
@@ -451,6 +698,247 @@ void main() {
           quality: 32,
         ),
         throwsRangeError,
+      );
+    });
+  });
+
+  group('FfmpegJob', () {
+    test(
+      'emits per-session progress, completes, and supports cancel',
+      () async {
+        final session = CancellableFakeSession(
+          returnCode: const FakeReturnCode(success: true),
+        );
+        final executor = AsyncCapturingExecutor(session);
+        const probe = FakeProbeSession(
+          properties: {
+            'format': {'duration': '2.0'},
+            'streams': <dynamic>[],
+          },
+        );
+        final kit = $FfmpegKit(
+          executor: executor,
+          probeExecutor: const FakeProbeExecutor(probe),
+        );
+
+        final job = await kit.startReduceVideoQualityByPercentage(
+          inputPath: 'input.mp4',
+          outputPath: 'out.mp4',
+          qualityPercentage: 50,
+        );
+        final progressFuture = job.progress.toList();
+
+        executor.emit(const FakeStatistics(timeInMilliseconds: 1000));
+        await job.cancel();
+        executor.complete();
+
+        final progress = await progressFuture;
+        final result = await job.result;
+        expect(job.sessionId, 42);
+        expect(session.cancelled, isTrue);
+        expect(progress, hasLength(1));
+        expect(progress.single.processedDuration, const Duration(seconds: 1));
+        expect(progress.single.percentage, 50);
+        expect(result.isSuccess, isTrue);
+      },
+    );
+
+    test('deletes a partial output after FFmpeg failure', () async {
+      final temporaryDirectory = await Directory.systemTemp.createTemp(
+        'my_maker_video_test_',
+      );
+      addTearDown(() => temporaryDirectory.delete(recursive: true));
+      final output = File('${temporaryDirectory.path}/thumbnail.jpg');
+      await output.writeAsString('partial');
+      final session = CancellableFakeSession(
+        returnCode: const FakeReturnCode(),
+        output: 'failed',
+      );
+      final executor = AsyncCapturingExecutor(session);
+      final kit = $FfmpegKit(executor: executor);
+
+      final job = await kit.startExtractThumbnail(
+        inputPath: 'input.mp4',
+        outputPath: output.path,
+      );
+      executor.complete();
+
+      final result = await job.result;
+      expect(result.isSuccess, isFalse);
+      expect(await output.exists(), isFalse);
+    });
+
+    test('reports cancellation unsupported for a legacy executor', () async {
+      final kit = $FfmpegKit(
+        executor: CapturingExecutor(
+          const FakeSession(returnCode: FakeReturnCode(success: true)),
+        ),
+      );
+
+      final job = await kit.startExtractThumbnail(
+        inputPath: 'input.mp4',
+        outputPath: 'output.jpg',
+      );
+
+      await expectLater(job.cancel(), throwsUnsupportedError);
+      expect((await job.result).isSuccess, isTrue);
+    });
+  });
+
+  group('extractThumbnail', () {
+    test(
+      'builds an accurate thumbnail command with optional scaling',
+      () async {
+        final executor = CapturingExecutor(
+          const FakeSession(returnCode: FakeReturnCode(success: true)),
+        );
+        final kit = $FfmpegKit(executor: executor);
+
+        final result = await kit.extractThumbnail(
+          inputPath: 'input video.mp4',
+          outputPath: 'thumbnail image.jpg',
+          position: const Duration(milliseconds: 1500),
+          width: 320,
+        );
+
+        expect(executor.lastArguments, [
+          '-y',
+          '-i',
+          'input video.mp4',
+          '-ss',
+          '1.5',
+          '-frames:v',
+          '1',
+          '-an',
+          '-vf',
+          'scale=320:-1',
+          'thumbnail image.jpg',
+        ]);
+        expect(result.isSuccess, isTrue);
+      },
+    );
+
+    test('rejects a negative position and matching output path', () async {
+      final kit = $FfmpegKit(
+        executor: CapturingExecutor(
+          const FakeSession(returnCode: FakeReturnCode(success: true)),
+        ),
+      );
+
+      await expectLater(
+        kit.extractThumbnail(
+          inputPath: 'input.mp4',
+          outputPath: 'output.jpg',
+          position: const Duration(milliseconds: -1),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        kit.extractThumbnail(inputPath: 'input.mp4', outputPath: 'input.mp4'),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('trimVideo', () {
+    test('builds an accurate re-encode command', () async {
+      final executor = CapturingExecutor(
+        const FakeSession(returnCode: FakeReturnCode(success: true)),
+      );
+      final kit = $FfmpegKit(executor: executor);
+
+      final result = await kit.trimVideo(
+        inputPath: 'input.mp4',
+        outputPath: 'trimmed.mp4',
+        start: const Duration(milliseconds: 500),
+        end: const Duration(milliseconds: 2500),
+        quality: 20,
+      );
+
+      expect(executor.lastArguments, [
+        '-y',
+        '-i',
+        'input.mp4',
+        '-ss',
+        '0.5',
+        '-t',
+        '2',
+        '-map',
+        '0:v:0',
+        '-map',
+        '0:a?',
+        '-c:v',
+        'libx264',
+        '-preset',
+        'medium',
+        '-crf',
+        '20',
+        '-c:a',
+        'aac',
+        '-movflags',
+        '+faststart',
+        'trimmed.mp4',
+      ]);
+      expect(result.isSuccess, isTrue);
+    });
+
+    test('builds a fast stream-copy command', () async {
+      final executor = CapturingExecutor(
+        const FakeSession(returnCode: FakeReturnCode(success: true)),
+      );
+      final kit = $FfmpegKit(executor: executor);
+
+      await kit.trimVideo(
+        inputPath: 'input.mp4',
+        outputPath: 'trimmed.mp4',
+        start: const Duration(seconds: 1),
+        duration: const Duration(seconds: 3),
+        mode: VideoTrimMode.fast,
+      );
+
+      expect(executor.lastArguments, [
+        '-y',
+        '-ss',
+        '1',
+        '-i',
+        'input.mp4',
+        '-t',
+        '3',
+        '-map',
+        '0:v:0',
+        '-map',
+        '0:a?',
+        '-c',
+        'copy',
+        '-avoid_negative_ts',
+        'make_zero',
+        'trimmed.mp4',
+      ]);
+    });
+
+    test('requires exactly one valid end or duration', () async {
+      final kit = $FfmpegKit(
+        executor: CapturingExecutor(
+          const FakeSession(returnCode: FakeReturnCode(success: true)),
+        ),
+      );
+
+      await expectLater(
+        kit.trimVideo(
+          inputPath: 'input.mp4',
+          outputPath: 'trimmed.mp4',
+          start: Duration.zero,
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        kit.trimVideo(
+          inputPath: 'input.mp4',
+          outputPath: 'trimmed.mp4',
+          start: const Duration(seconds: 2),
+          end: const Duration(seconds: 1),
+        ),
+        throwsArgumentError,
       );
     });
   });

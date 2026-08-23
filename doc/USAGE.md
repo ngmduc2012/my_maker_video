@@ -152,7 +152,117 @@ Future<String?> createGif(String videoPath) async {
 GIF `quality` accepts 1 to 31; lower is clearer. `fps` and `scale` must be
 positive.
 
-## 7. Handle validation and unexpected errors
+## 7. Inspect media
+
+```dart
+Future<MediaInfo?> inspectVideo(String videoPath) async {
+  final result = await MyMakerVideo.ffmpegKit.inspectMedia(
+    inputPath: videoPath,
+  );
+
+  if (!result.isSuccess) {
+    debugPrint(result.message);
+    return null;
+  }
+
+  final info = result.mediaInfo!;
+  debugPrint('Format: ${info.format}');
+  debugPrint('Duration: ${info.duration}');
+  debugPrint('Video codec: ${info.videoStream?.codec}');
+  debugPrint('Audio codec: ${info.audioStream?.codec}');
+  return info;
+}
+```
+
+`MediaInfo.streams` contains every stream. Each `MediaStreamInfo` reports its
+type, codec, bitrate, dimensions or sample rate, frame rate, rotation, and tags
+when those values exist in the source.
+
+## 8. Show progress and cancel one job
+
+Use a `start...` method when the UI needs progress or a Cancel button:
+
+```dart
+Future<FfmpegResult> compressWithProgress({
+  required String inputPath,
+  required String outputPath,
+  required void Function(double? percentage) onProgress,
+}) async {
+  final job = await MyMakerVideo.ffmpegKit
+      .startReduceVideoQualityByPercentage(
+    inputPath: inputPath,
+    outputPath: outputPath,
+    qualityPercentage: 50,
+  );
+
+  final subscription = job.progress.listen((value) {
+    onProgress(value.percentage);
+  });
+
+  try {
+    return await job.result;
+  } finally {
+    await subscription.cancel();
+  }
+}
+```
+
+Keep the returned `FfmpegJob` in widget state and call `await job.cancel()` from
+the Cancel button. Cancellation targets that session only. `percentage` is
+`null` when the input duration is unknown; `processedDuration`, frames, output
+size, bitrate, FPS, and speed remain available.
+
+The job API deletes partial output after failure or cancellation by default.
+Set `deletePartialOutput: false` only when the application intentionally wants
+to inspect or keep incomplete output.
+
+## 9. Extract a thumbnail
+
+```dart
+final result = await MyMakerVideo.ffmpegKit.extractThumbnail(
+  inputPath: videoPath,
+  outputPath: '${outputDirectory.path}/thumbnail.jpg',
+  position: const Duration(seconds: 2),
+  width: 320,
+);
+```
+
+The position cannot be negative. Use a `.jpg` or `.png` output path. Supplying
+one dimension preserves aspect ratio; supplying both fits the thumbnail inside
+the requested bounds.
+
+## 10. Trim a video
+
+Frame-accurate mode decodes and re-encodes the selected range:
+
+```dart
+final result = await MyMakerVideo.ffmpegKit.trimVideo(
+  inputPath: videoPath,
+  outputPath: '${outputDirectory.path}/trimmed.mp4',
+  start: const Duration(seconds: 3),
+  end: const Duration(seconds: 8),
+  mode: VideoTrimMode.accurate,
+  quality: 23,
+);
+```
+
+Fast mode copies streams without generation loss:
+
+```dart
+final result = await MyMakerVideo.ffmpegKit.trimVideo(
+  inputPath: videoPath,
+  outputPath: '${outputDirectory.path}/trimmed-fast.mp4',
+  start: const Duration(seconds: 3),
+  duration: const Duration(seconds: 5),
+  mode: VideoTrimMode.fast,
+);
+```
+
+Supply exactly one of `duration` and `end`. Fast mode is quicker but can start
+at a nearby keyframe and requires source codecs compatible with the output
+container.
+
+## 11. Handle validation and unexpected errors
 
 ```dart
 Future<void> runSafely(Future<void> Function() operation) async {
@@ -175,7 +285,7 @@ parameter ranges throw before FFmpeg starts.
 Existing output files are overwritten. Await one operation before starting
 another operation that uses the same output file.
 
-## 8. Parameter reference
+## 12. Parameter reference
 
 | Method | Parameter | Range/default |
 | --- | --- | --- |
@@ -187,8 +297,13 @@ another operation that uses the same output file.
 | Video to GIF | `fps` | Positive finite value |
 | Video to GIF | `quality` | `1..31`; lower is clearer |
 | Video to GIF | `scale` | Positive width; default `320` |
+| Thumbnail | `position` | Zero or positive duration |
+| Thumbnail | `width`, `height` | Positive or omitted |
+| Trim | `start` | Zero or positive duration |
+| Trim | `duration` / `end` | Exactly one valid range boundary |
+| Accurate trim | `quality` | H.264 CRF `1..51`; default `23` |
 
-## 9. Storage checklist
+## 13. Storage checklist
 
 - Use a system picker for input files.
 - Prefer an app-scoped output directory.
@@ -199,13 +314,13 @@ another operation that uses the same output file.
 - Copy a picked file into app storage if the platform gives only temporary
   access to its original URI.
 
-## 10. Full-GPL dependency
+## 14. Full-GPL dependency
 
 MyMakerVideo uses the Full-GPL `ffmpeg_kit_flutter_new` package to retain
 `libx264`. Review its GPL terms before distributing an application.
 
-## 11. Next features
+## 15. Next features
 
-See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for the researched roadmap. The
-recommended first additions are media metadata, progress/cancellation,
-thumbnail extraction, trimming, and clearer compression presets.
+See [FEATURE_ROADMAP.md](FEATURE_ROADMAP.md) for implementation status and the
+next researched additions: clearer compression presets, resize/crop/rotate,
+merge, audio operations, and higher-quality GIF palettes.
