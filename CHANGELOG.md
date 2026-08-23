@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## [0.2.0] - 2026-08-23
 - Add typed media inspection backed by FFprobe.
 - Add per-session progress streams and cancellation for long-running jobs.
 - Add thumbnail extraction and accurate/fast video trimming helpers.
