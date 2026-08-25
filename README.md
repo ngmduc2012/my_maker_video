@@ -7,8 +7,6 @@ _[![Support Me on Ko-fi](https://img.shields.io/badge/Donate-Ko_fi-red?logo=ko-f
 
 # MyMakerVideo
 
-![MyMakerVideo package artwork](avatar.png)
-
 Inspect and edit media, create an MP4 from a numbered PNG sequence, add an
 image/video watermark, reduce video quality, or convert a video to GIF from
 Flutter.

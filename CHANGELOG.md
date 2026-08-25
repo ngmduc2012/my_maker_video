@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## [0.2.2] - 2026-08-25
+- Remove the large package artwork from the top of the public README while
+  retaining the original numbered-image illustration in the usage guide.
+
 ## [0.2.1] - 2026-08-23
 - Restore the package artwork and the original numbered-image illustration in
   the public README.
